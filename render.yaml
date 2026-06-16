@@ -17,6 +17,10 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: https://jarvis-web.onrender.com
+      - key: ANDROID_APK_URL
+        sync: false
+      - key: WINDOWS_AGENT_URL
+        sync: false
 
   - type: web
     name: jarvis-web

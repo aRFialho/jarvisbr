@@ -6,9 +6,10 @@ import '../hologram/holo_state.dart';
 import '../voice/voice_profile.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.profile});
+  const ChatScreen({super.key, required this.profile, required this.deviceToken});
 
   final VoiceProfile profile;
+  final String deviceToken;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();

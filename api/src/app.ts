@@ -10,6 +10,7 @@ import { confirmationRoutes } from "./confirmations/confirmation.routes.js";
 import { agentExecutionRoutes } from "./confirmations/agent-execution.routes.js";
 import { auditRoutes } from "./audit/audit.routes.js";
 import { websocketRoutes } from "./websocket/hub.js";
+import { serviceRoutes } from "./service/service.routes.js";
 
 export async function buildApp() {
   const app = Fastify({
@@ -40,6 +41,7 @@ export async function buildApp() {
   await confirmationRoutes(app);
   await agentExecutionRoutes(app);
   await auditRoutes(app);
+  await serviceRoutes(app);
 
   return app;
 }

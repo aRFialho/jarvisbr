@@ -23,6 +23,36 @@ export type FileResult = {
   mock?: boolean;
 };
 
+export type Settings = {
+  assistant_name: string;
+  wake_phrases: string[];
+  response_tone: string;
+  require_confirmation_for_all_actions: boolean;
+  floating_button_enabled: boolean;
+  always_listening_enabled: boolean;
+  humor_level: number;
+  slang_level: number;
+  answer_length: string;
+  assistant_avatar_url?: string;
+  agent_avatar_url?: string;
+  agent_install_mode: string;
+};
+
+export type ServiceHealth = {
+  api: string;
+  database: string;
+  devices: Record<string, number>;
+  confirmations: Record<string, number>;
+  commands: Record<string, number>;
+  checkedAt: string;
+};
+
+export type PairingCode = {
+  pairingId: string;
+  code: string;
+  expiresAt: string;
+};
+
 export type Confirmation = {
   id: string;
   command_id: string;
@@ -57,6 +87,40 @@ export class JarvisApi {
 
   async devices() {
     return this.request<{ devices: Device[] }>("/devices");
+  }
+
+  async settings() {
+    return this.request<{ settings: Settings; voices: unknown[] }>("/me/settings");
+  }
+
+  async updateSettings(settings: Partial<{
+    assistantName: string;
+    wakePhrases: string[];
+    responseTone: string;
+    humorLevel: number;
+    slangLevel: number;
+    answerLength: string;
+    assistantAvatarUrl: string;
+    agentAvatarUrl: string;
+    floatingButtonEnabled: boolean;
+    alwaysListeningEnabled: boolean;
+  }>) {
+    return this.request<{ settings: Settings }>("/me/settings", { method: "PATCH", body: settings });
+  }
+
+  async serviceHealth() {
+    return this.request<ServiceHealth>("/service/health");
+  }
+
+  async installManifest() {
+    return this.request<{ artifacts: unknown[]; androidApkUrl: string | null; windowsAgentUrl: string | null }>("/install/manifest");
+  }
+
+  async createPairingCode(requestedDeviceName: string) {
+    return this.request<PairingCode>("/devices/pairing-code", {
+      method: "POST",
+      body: { requestedDeviceName }
+    });
   }
 
   async pairMockCasa() {

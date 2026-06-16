@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'features/chat/chat_screen.dart';
+import 'features/devices/pairing_screen.dart';
 import 'features/voice/voice_profile.dart';
 
 void main() {
@@ -24,7 +25,9 @@ class JarvisMobileApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: ChatScreen(profile: profile),
+      home: PairingScreen(
+        onPaired: (deviceToken) => ChatScreen(profile: profile, deviceToken: deviceToken),
+      ),
     );
   }
 }

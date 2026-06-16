@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from .auth import DeviceApi
+from .apk_downloader import download_android_apk
 from .config import load_config
 from .confirmation_guard import ConfirmationGuard
 from .file_indexer import FileIndexer
@@ -19,6 +20,11 @@ async def main() -> None:
     indexer = FileIndexer(config.data_dir / "files.sqlite3", config.allowed_dirs)
     indexed = indexer.scan_once()
     print(f"Jarvis Agent indexou {indexed} arquivos em pastas autorizadas.")
+    try:
+        apk = download_android_apk(config.api_url, config.data_dir / "downloads")
+        print(apk.message)
+    except Exception as exc:
+        print(f"APK Android nao baixado agora: {exc}")
 
     api = DeviceApi(config.api_url, config.device_token)
     guard = ConfirmationGuard(api)

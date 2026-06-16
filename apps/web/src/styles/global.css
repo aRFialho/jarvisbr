@@ -33,6 +33,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -46,6 +47,10 @@ button {
   min-height: 100vh;
   margin: 0 auto;
   padding: 24px 0 36px;
+}
+
+.wide-shell {
+  width: min(1360px, calc(100vw - 32px));
 }
 
 .auth-shell {
@@ -81,6 +86,43 @@ button {
   grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1.1fr);
   gap: 22px;
   align-items: stretch;
+}
+
+.console-layout {
+  display: grid;
+  grid-template-columns: 168px minmax(320px, 0.88fr) minmax(380px, 1.12fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.nav-rail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  background: rgba(2, 11, 14, 0.76);
+  padding: 12px;
+  box-shadow: var(--shadow);
+}
+
+.nav-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px;
+  text-align: left;
+}
+
+.nav-button.active,
+.nav-button:hover {
+  border-color: var(--line);
+  background: var(--cyan-soft);
+  color: var(--cyan);
 }
 
 .holo {
@@ -258,6 +300,27 @@ button {
   gap: 14px;
 }
 
+.panel-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cyan);
+  font-family: "Oxanium", sans-serif;
+  font-size: 1rem;
+  text-transform: uppercase;
+}
+
+.muted-copy {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 label {
   display: grid;
   gap: 7px;
@@ -266,6 +329,7 @@ label {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid rgba(38, 244, 255, 0.26);
@@ -297,6 +361,117 @@ textarea {
 
 .device-pill small {
   color: var(--green);
+}
+
+.device-grid,
+.metric-grid,
+.settings-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.device-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.device-card,
+.metric,
+.pairing-code,
+.status-banner,
+.install-command {
+  border: 1px solid rgba(38, 244, 255, 0.24);
+  background: rgba(5, 14, 17, 0.72);
+}
+
+.device-card {
+  display: grid;
+  gap: 6px;
+  min-height: 126px;
+  padding: 14px;
+}
+
+.device-card svg {
+  color: var(--cyan);
+}
+
+.device-card span,
+.device-card small {
+  color: var(--muted);
+}
+
+.metric-grid {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.metric {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+}
+
+.metric span {
+  color: var(--muted);
+}
+
+.metric strong {
+  color: var(--green);
+  font-family: "Oxanium", sans-serif;
+  font-size: 1.45rem;
+}
+
+.pairing-code {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border-color: rgba(245, 197, 66, 0.58);
+}
+
+.pairing-code span,
+.pairing-code small {
+  color: var(--muted);
+}
+
+.pairing-code strong {
+  color: var(--amber);
+  font-family: "Oxanium", sans-serif;
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  letter-spacing: 0;
+}
+
+.status-banner {
+  padding: 12px 14px;
+  color: var(--amber);
+  border-color: rgba(245, 197, 66, 0.42);
+}
+
+.status-banner.online {
+  color: var(--green);
+  border-color: rgba(67, 255, 155, 0.42);
+}
+
+.install-command {
+  overflow-x: auto;
+  margin: 0;
+  padding: 14px;
+  color: #d8fdff;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.settings-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(38, 244, 255, 0.2);
+  padding: 10px;
+}
+
+.toggle-row input {
+  width: auto;
 }
 
 .command-row {
@@ -495,7 +670,16 @@ textarea {
   }
 
   .auth-shell,
-  .main-grid {
+  .main-grid,
+  .console-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .settings-grid {
     grid-template-columns: 1fr;
   }
 

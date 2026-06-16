@@ -80,7 +80,7 @@ O sistema faz:
 
 ## Agent Windows
 
-Depois de criar conta no painel, gere um codigo em `POST /devices/pairing-code` ou pelo botao do painel. O agent usa `/devices/claim` para receber `JARVIS_DEVICE_TOKEN`.
+Depois de criar conta no painel web, abra a aba `Instalar Agent`, gere a chave temporaria e execute o comando PowerShell exibido. O agent usa `/devices/claim` para receber `JARVIS_DEVICE_TOKEN`, instala uma tarefa de segundo plano no Windows e tenta baixar o APK Android quando `ANDROID_APK_URL` estiver configurado no Render.
 
 ```bash
 cd agents/windows
@@ -92,6 +92,26 @@ set JARVIS_DEVICE_TOKEN=cole-o-token
 set JARVIS_ALLOWED_DIRS=C:\Users\seu-usuario\Downloads;C:\Users\seu-usuario\Pictures
 jarvis-agent
 ```
+
+Instalacao de segundo plano pelo painel:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\agents\windows\install-agent.ps1 -ApiUrl "https://jarvis-api.onrender.com" -PairingCode "123456"
+```
+
+Quando o APK Android existir, configure no Render:
+
+```text
+ANDROID_APK_URL=https://seu-dominio/jarvisbr-android.apk
+```
+
+O instalador salva o APK em:
+
+```text
+%USERPROFILE%\.jarvis-agent\downloads\jarvisbr-android.apk
+```
+
+No Android, a primeira tela pede o codigo de vinculacao gerado na aba `Aparelhos`. Depois disso o app ja entra vinculado a conta.
 
 ## Garantias
 

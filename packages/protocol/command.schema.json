@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jarvis.local/schemas/command.schema.json",
+  "title": "JarvisCommand",
+  "type": "object",
+  "required": ["id", "rawText", "intent", "status"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "rawText": { "type": "string", "minLength": 1 },
+    "intent": {
+      "type": "string",
+      "enum": ["conversation", "file.search", "file.download", "app.prepare", "browser.prepare"]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "search_pending",
+        "awaiting_file_selection",
+        "awaiting_confirmation",
+        "confirmed",
+        "executing",
+        "completed",
+        "failed",
+        "blocked",
+        "rejected"
+      ]
+    },
+    "targetDeviceId": { "type": ["string", "null"], "format": "uuid" },
+    "riskLevel": { "type": "string", "enum": ["low", "medium", "high"] }
+  }
+}

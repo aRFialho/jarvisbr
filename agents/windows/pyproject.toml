@@ -1,0 +1,28 @@
+[project]
+name = "jarvis-windows-agent"
+version = "0.1.0"
+description = "Agent Windows do Jarvis BR para indexar arquivos proprios e executar apenas acoes confirmadas."
+requires-python = ">=3.11"
+dependencies = [
+  "requests>=2.32.3",
+  "websockets>=14.1",
+  "watchdog>=6.0.0",
+  "pillow>=11.0.0",
+  "python-dotenv>=1.0.1"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3.4"]
+
+[project.scripts]
+jarvis-agent = "jarvis_agent.main:run"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["jarvis_agent"]

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
+coverage/
+*.log
+__pycache__/
+.pytest_cache/
+*.pyc
+*.sqlite3
+.dart_tool/
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+pubspec.lock

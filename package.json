@@ -1,0 +1,16 @@
+{
+  "name": "jarvis-ai",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "api",
+    "apps/web"
+  ],
+  "scripts": {
+    "api:dev": "npm --workspace api run dev",
+    "api:build": "npm --workspace api run build",
+    "api:test": "npm --workspace api run test",
+    "web:dev": "npm --workspace apps/web run dev",
+    "web:build": "npm --workspace apps/web run build"
+  }
+}

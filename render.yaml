@@ -1,0 +1,51 @@
+services:
+  - type: web
+    name: jarvis-api
+    runtime: node
+    rootDir: api
+    plan: free
+    buildCommand: npm ci && npm run build
+    preDeployCommand: npm run db:migrate
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DEVICE_TOKEN_SECRET
+        generateValue: true
+      - key: CORS_ORIGIN
+        value: https://jarvis-web.onrender.com
+
+  - type: web
+    name: jarvis-web
+    runtime: static
+    rootDir: apps/web
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://jarvis-api.onrender.com
+
+# Worker implementado em api/src/workers/worker.ts.
+# Render informa que plan: free nao esta disponivel para background workers.
+# Por isso o worker NAO fica ativo por padrao para evitar custo automatico.
+# Para habilitar manualmente depois, crie um worker pago conscientemente:
+#
+#  - type: worker
+#    name: jarvis-worker
+#    runtime: node
+#    rootDir: api
+#    plan: starter
+#    buildCommand: npm ci && npm run build
+#    startCommand: npm run worker
+#    envVars:
+#      - key: NODE_ENV
+#        value: production
+#      - key: DATABASE_URL
+#        sync: false
+#      - key: JWT_SECRET
+#        sync: false

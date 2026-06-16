@@ -1,0 +1,4 @@
+-- Opcional para desenvolvimento local. Edite o hash antes de usar em ambiente real.
+-- INSERT INTO users(name, email, password_hash)
+-- VALUES ('Alan', 'alan@example.com', '$2a$12$replace-with-bcrypt-hash')
+-- ON CONFLICT (email) DO NOTHING;

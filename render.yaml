@@ -3,8 +3,8 @@ services:
     name: jarvis-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm --workspace api run build
-    startCommand: npm --workspace api run db:migrate && npm --workspace api run start
+    buildCommand: npm ci --include=dev && npm --workspace api run build
+    startCommand: npm --workspace api run db:migrate:prod && npm --workspace api run start
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -21,7 +21,7 @@ services:
   - type: web
     name: jarvis-web
     runtime: static
-    buildCommand: npm ci && npm --workspace apps/web run build
+    buildCommand: npm ci --include=dev && npm --workspace apps/web run build
     staticPublishPath: apps/web/dist
     envVars:
       - key: VITE_API_URL
@@ -36,7 +36,7 @@ services:
 #    name: jarvis-worker
 #    runtime: node
 #    plan: starter
-#    buildCommand: npm ci && npm --workspace api run build
+#    buildCommand: npm ci --include=dev && npm --workspace api run build
 #    startCommand: npm --workspace api run worker
 #    envVars:
 #      - key: NODE_ENV

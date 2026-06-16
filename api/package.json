@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
-    "worker": "node dist/workers/worker.js",
+    "start": "node dist/src/server.js",
+    "worker": "node dist/src/workers/worker.js",
     "db:migrate": "tsx scripts/migrate.ts",
+    "db:migrate:prod": "node dist/scripts/migrate.js",
     "db:check": "tsx scripts/check-db.ts",
+    "db:check:prod": "node dist/scripts/check-db.js",
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {

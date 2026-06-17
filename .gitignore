@@ -14,3 +14,4 @@ build/
 .flutter-plugins
 .flutter-plugins-dependencies
 pubspec.lock
+apps/mobile/credentials.json

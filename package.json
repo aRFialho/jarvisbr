@@ -4,13 +4,17 @@
   "private": true,
   "workspaces": [
     "api",
-    "apps/web"
+    "apps/web",
+    "apps/mobile"
   ],
   "scripts": {
     "api:dev": "npm --workspace api run dev",
     "api:build": "npm --workspace api run build",
     "api:test": "npm --workspace api run test",
     "web:dev": "npm --workspace apps/web run dev",
-    "web:build": "npm --workspace apps/web run build"
+    "web:build": "npm --workspace apps/web run build",
+    "mobile:start": "npm --workspace apps/mobile run start",
+    "mobile:typecheck": "npm --workspace apps/mobile run typecheck",
+    "mobile:build:android:preview": "npm --workspace apps/mobile run build:android:preview"
   }
 }

@@ -75,6 +75,33 @@ export type Confirmation = {
   expires_at: string;
 };
 
+const emptySettings: Settings = {
+  assistant_name: "Jarvis",
+  wake_phrases: ["Jarvis"],
+  response_tone: "futurista_direto",
+  require_confirmation_for_all_actions: true,
+  floating_button_enabled: true,
+  always_listening_enabled: false,
+  humor_level: 0.4,
+  slang_level: 0.2,
+  answer_length: "curta_objetiva",
+  assistant_avatar_url: "",
+  agent_avatar_url: "",
+  agent_install_mode: "manual"
+};
+
+function hasId(value: unknown): value is { id: string } {
+  return Boolean(value && typeof value === "object" && "id" in value && typeof (value as { id?: unknown }).id === "string");
+}
+
+function ensureIdentified<T extends object>(value: T | undefined, label: string): T & { id: string } {
+  if (hasId(value)) {
+    return value as T & { id: string };
+  }
+
+  throw new Error(`${label} retornou sem identificador. Atualize a tela e tente novamente.`);
+}
+
 export class JarvisApi {
   token = localStorage.getItem("jarvis_token") ?? "";
 
@@ -99,11 +126,20 @@ export class JarvisApi {
   }
 
   async devices() {
-    return this.request<{ devices: Device[] }>("/devices");
+    const data = await this.request<{ devices?: Device[] }>("/devices");
+    return {
+      devices: Array.isArray(data.devices)
+        ? data.devices.filter((device): device is Device => hasId(device))
+        : []
+    };
   }
 
   async settings() {
-    return this.request<{ settings: Settings; voices: unknown[] }>("/me/settings");
+    const data = await this.request<{ settings?: Settings; voices?: unknown[] }>("/me/settings");
+    return {
+      settings: data.settings ?? emptySettings,
+      voices: Array.isArray(data.voices) ? data.voices : []
+    };
   }
 
   async updateSettings(settings: Partial<{
@@ -130,10 +166,16 @@ export class JarvisApi {
   }
 
   async createPairingCode(requestedDeviceName: string) {
-    return this.request<PairingCode>("/devices/pairing-code", {
+    const pairing = await this.request<PairingCode>("/devices/pairing-code", {
       method: "POST",
       body: { requestedDeviceName }
     });
+
+    if (!pairing.pairingId || !pairing.code) {
+      throw new Error("Codigo de vinculacao retornou incompleto. Atualize a tela e tente novamente.");
+    }
+
+    return pairing;
   }
 
   async pairMockCasa() {
@@ -154,21 +196,33 @@ export class JarvisApi {
   }
 
   async createCommand(rawText: string) {
-    return this.request<{ command: { id: string }; interpreted: { query: string; requestedKind?: string } }>("/commands", {
+    const data = await this.request<{ command?: { id: string }; interpreted?: { query: string; requestedKind?: string } }>("/commands", {
       method: "POST",
       body: { rawText }
     });
+
+    const command = ensureIdentified(data.command, "Comando");
+    return {
+      command,
+      interpreted: data.interpreted ?? { query: rawText }
+    };
   }
 
   async searchFiles(commandId: string, query?: string, requestedKind?: string) {
-    return this.request<{ results: FileResult[] }>(`/commands/${commandId}/search-files`, {
+    const data = await this.request<{ results?: FileResult[] }>(`/commands/${commandId}/search-files`, {
       method: "POST",
       body: { query, requestedKind, limit: 8 }
     });
+
+    return {
+      results: Array.isArray(data.results)
+        ? data.results.filter((result) => Boolean(result?.localFileId))
+        : []
+    };
   }
 
   async selectFile(commandId: string, file: FileResult) {
-    return this.request<{ confirmation: Confirmation }>(`/commands/${commandId}/select-file`, {
+    const data = await this.request<{ confirmation?: Confirmation }>(`/commands/${commandId}/select-file`, {
       method: "POST",
       body: {
         localFileId: file.localFileId,
@@ -177,6 +231,10 @@ export class JarvisApi {
         sourceDeviceId: file.deviceId
       }
     });
+
+    return {
+      confirmation: ensureIdentified(data.confirmation, "Confirmacao")
+    };
   }
 
   async confirm(confirmationId: string, phrase: string) {

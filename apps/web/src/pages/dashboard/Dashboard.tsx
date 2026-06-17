@@ -70,10 +70,11 @@ const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
 
 export function Dashboard() {
   const [isAuthed, setIsAuthed] = useState(jarvisApi.authenticated);
+  const [authReady, setAuthReady] = useState(jarvisApi.authenticated);
   const [activeTab, setActiveTab] = useState<Tab>("chat");
-  const [email, setEmail] = useState("jarvisbr@admin.com.br");
-  const [password, setPassword] = useState("JAlan@192837");
-  const [name, setName] = useState("Super Admin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
   const [settings, setSettings] = useState<JarvisSettings | null>(null);
   const [health, setHealth] = useState<ServiceHealth | null>(null);
@@ -106,10 +107,10 @@ export function Dashboard() {
   const onlineCount = devices.filter((device) => device.status === "online").length;
 
   useEffect(() => {
-    if (isAuthed) {
+    if (isAuthed && authReady) {
       refreshAll().catch(showError);
     }
-  }, [isAuthed]);
+  }, [isAuthed, authReady]);
 
   async function refreshAll() {
     const [deviceData, settingsData, healthData] = await Promise.all([
@@ -123,17 +124,24 @@ export function Dashboard() {
   }
 
   async function handleAuth(mode: "login" | "register") {
+    setHoloState("idle");
+    setMessage("Abrindo o Web Control Center. Validacao segura em segundo plano.");
+    setIsAuthed(true);
+    setAuthReady(false);
+
     try {
-      setHoloState("thinking");
       if (mode === "register") {
         await jarvisApi.register(name, email, password);
       } else {
         await jarvisApi.login(email, password);
       }
-      setIsAuthed(true);
+      setAuthReady(true);
       setMessage("Conta conectada. Instale o agent no desktop e depois vincule o Android por codigo.");
-      setHoloState("done");
+      setHoloState("idle");
     } catch (error) {
+      jarvisApi.logout();
+      setAuthReady(false);
+      setIsAuthed(false);
       showError(error);
     }
   }
@@ -318,8 +326,8 @@ export function Dashboard() {
         </div>
         <div className="toolbar header-tools">
           <span className="status-dot-label"><span className="status-dot online" /> {onlineCount} online</span>
-          <button className="icon-button" type="button" onClick={refreshAll} aria-label="Atualizar"><RefreshCw size={18} /></button>
-          <button className="icon-button" type="button" onClick={() => { jarvisApi.logout(); setIsAuthed(false); }} aria-label="Sair"><LogOut size={18} /></button>
+          <button className="icon-button" type="button" onClick={() => { if (authReady) refreshAll().catch(showError); }} aria-label="Atualizar"><RefreshCw size={18} /></button>
+          <button className="icon-button" type="button" onClick={() => { jarvisApi.logout(); setAuthReady(false); setIsAuthed(false); }} aria-label="Sair"><LogOut size={18} /></button>
         </div>
       </header>
 

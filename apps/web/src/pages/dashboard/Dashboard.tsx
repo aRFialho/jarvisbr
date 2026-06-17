@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -71,10 +71,10 @@ const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
 export function Dashboard() {
   const [isAuthed, setIsAuthed] = useState(jarvisApi.authenticated);
   const [authReady, setAuthReady] = useState(jarvisApi.authenticated);
+  const [authLoading, setAuthLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("chat");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [devices, setDevices] = useState<Device[]>([]);
   const [settings, setSettings] = useState<JarvisSettings | null>(null);
   const [health, setHealth] = useState<ServiceHealth | null>(null);
@@ -89,7 +89,12 @@ export function Dashboard() {
   const [phrase, setPhrase] = useState("");
   const [holoState, setHoloState] = useState<HoloState>("idle");
   const [interactionMode, setInteractionMode] = useState<InteractionMode>("voice");
-  const [message, setMessage] = useState("Chat por voz e texto pronto. Eu sempre peco confirmacao antes de agir.");
+  const [isListening, setIsListening] = useState(false);
+  const [message, setMessage] = useState(
+    jarvisApi.authenticated
+      ? "Chat por voz e texto pronto. Eu sempre peco confirmacao antes de agir."
+      : "Entre com e-mail e senha para acessar o Web Control Center."
+  );
   const [copyStatus, setCopyStatus] = useState("");
 
   const assistantName = settings?.assistant_name ?? "Jarvis";
@@ -105,12 +110,15 @@ export function Dashboard() {
   const hasDesktopAgent = desktopDevices.length > 0;
   const hasAndroid = mobileDevices.length > 0;
   const onlineCount = devices.filter((device) => device.status === "online").length;
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     if (isAuthed && authReady) {
       refreshAll().catch(showError);
     }
   }, [isAuthed, authReady]);
+
+  useEffect(() => () => stopVoiceCapture(false), []);
 
   async function refreshAll() {
     const [deviceData, settingsData, healthData] = await Promise.all([
@@ -123,19 +131,23 @@ export function Dashboard() {
     setHealth(healthData);
   }
 
-  async function handleAuth(mode: "login" | "register") {
+  async function handleLogin() {
+    const loginEmail = email.trim().toLowerCase();
+    if (!loginEmail || !password) {
+      setHoloState("error");
+      setMessage("Digite seu e-mail e senha para entrar.");
+      return;
+    }
+
+    setAuthLoading(true);
     setHoloState("idle");
-    setMessage("Abrindo o Web Control Center. Validacao segura em segundo plano.");
-    setIsAuthed(true);
-    setAuthReady(false);
+    setMessage("Validando credenciais de acesso.");
 
     try {
-      if (mode === "register") {
-        await jarvisApi.register(name, email, password);
-      } else {
-        await jarvisApi.login(email, password);
-      }
+      await jarvisApi.login(loginEmail, password);
+      setEmail(loginEmail);
       setAuthReady(true);
+      setIsAuthed(true);
       setMessage("Conta conectada. Instale o agent no desktop e depois vincule o Android por codigo.");
       setHoloState("idle");
     } catch (error) {
@@ -143,12 +155,15 @@ export function Dashboard() {
       setAuthReady(false);
       setIsAuthed(false);
       showError(error);
+    } finally {
+      setAuthLoading(false);
     }
   }
 
   async function runCommand() {
     try {
-      setHoloState(interactionMode === "voice" ? "listening" : "thinking");
+      stopVoiceCapture();
+      setHoloState("thinking");
       setMessage(command);
       speak(`${assistantName} analisando o pedido.`);
       setResults([]);
@@ -201,6 +216,11 @@ export function Dashboard() {
   }
 
   function startVoiceCapture() {
+    if (recognitionRef.current) {
+      stopVoiceCapture();
+      return;
+    }
+
     const SpeechRecognition = (window as unknown as {
       SpeechRecognition?: new () => SpeechRecognitionLike;
       webkitSpeechRecognition?: new () => SpeechRecognitionLike;
@@ -213,21 +233,51 @@ export function Dashboard() {
     }
 
     const recognition = new SpeechRecognition();
+    recognitionRef.current = recognition;
     recognition.lang = "pt-BR";
     recognition.interimResults = false;
+    recognition.continuous = false;
     recognition.onstart = () => {
       setInteractionMode("voice");
+      setIsListening(true);
       setHoloState("listening");
       setMessage("Ouvindo...");
     };
     recognition.onresult = (event) => {
       const text = event.results[0][0].transcript;
       setCommand(text);
-      setMessage(text);
-      setHoloState("thinking");
+      setMessage(`Capturado: ${text}`);
+      stopVoiceCapture();
     };
-    recognition.onerror = () => showError(new Error("Nao consegui ouvir com clareza."));
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) {
+        recognitionRef.current = null;
+      }
+      setIsListening(false);
+      setHoloState((current) => current === "listening" ? "idle" : current);
+    };
+    recognition.onerror = () => {
+      recognitionRef.current = null;
+      setIsListening(false);
+      showError(new Error("Nao consegui ouvir com clareza."));
+    };
     recognition.start();
+  }
+
+  function stopVoiceCapture(updateState = true) {
+    const recognition = recognitionRef.current;
+    recognitionRef.current = null;
+    if (recognition) {
+      try {
+        recognition.stop();
+      } catch {
+        recognition.abort?.();
+      }
+    }
+    if (updateState) {
+      setIsListening(false);
+      setHoloState((current) => current === "listening" ? "idle" : current);
+    }
   }
 
   async function createDesktopPairing() {
@@ -289,16 +339,16 @@ export function Dashboard() {
           <p>Seu assistente inteligente. Todos os seus dispositivos. Uma unica experiencia.</p>
         </header>
         <section className="auth-hero">
-          <HoloAvatar state={holoState} assistantName="Jarvis" transcript="Entre ou crie sua conta para vincular apenas aparelhos proprios." />
+          <HoloAvatar state={holoState} assistantName="Jarvis" transcript={message} />
         </section>
         <section className="auth-panel holo-card">
           <PanelTitle icon={<Lock size={18} />} title="Acesso seguro" subtitle="Web Control Center" />
-          <label>Nome<input value={name} onChange={(event) => setName(event.target.value)} /></label>
           <label>E-mail<input value={email} onChange={(event) => setEmail(event.target.value)} /></label>
-          <label>Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+          <label>Senha<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void handleLogin(); }} /></label>
           <div className="toolbar">
-            <button className="primary-button" type="button" onClick={() => handleAuth("register")}>Criar conta</button>
-            <button className="ghost-button" type="button" onClick={() => handleAuth("login")}>Entrar</button>
+            <button className="primary-button" type="button" onClick={handleLogin} disabled={authLoading || !email.trim() || !password}>
+              {authLoading ? "Entrando..." : "Entrar"}
+            </button>
           </div>
           <div className="auth-mini-grid">
             <StatusPill label="Criptografia" value="Ativa" tone="good" />
@@ -382,6 +432,7 @@ export function Dashboard() {
               setCommand={setCommand}
               runCommand={runCommand}
               startVoiceCapture={startVoiceCapture}
+              isListening={isListening}
               results={results}
               selectedFile={selectedFile}
               chooseFile={chooseFile}
@@ -396,6 +447,7 @@ export function Dashboard() {
               setMode={setInteractionMode}
               holoState={holoState}
               startVoiceCapture={startVoiceCapture}
+              isListening={isListening}
               setHoloState={setHoloState}
             />
           )}
@@ -462,6 +514,7 @@ function ChatPanel(props: {
   setCommand: (value: string) => void;
   runCommand: () => void;
   startVoiceCapture: () => void;
+  isListening: boolean;
   results: FileResult[];
   selectedFile: FileResult | null;
   chooseFile: (file: FileResult) => void;
@@ -497,7 +550,7 @@ function ChatPanel(props: {
         </section>
       </div>
       <div className="command-row">
-        <button className="orb-button" type="button" aria-label="Capturar voz" onClick={props.startVoiceCapture}>
+        <button className={`orb-button ${props.isListening ? "listening" : ""}`} type="button" aria-label="Capturar voz" onClick={props.startVoiceCapture}>
           <Mic size={22} />
         </button>
         <textarea value={props.command} onChange={(event) => props.setCommand(event.target.value)} />
@@ -527,11 +580,12 @@ function ChatPanel(props: {
   );
 }
 
-function VoiceTextPanel({ mode, setMode, holoState, startVoiceCapture, setHoloState }: {
+function VoiceTextPanel({ mode, setMode, holoState, startVoiceCapture, isListening, setHoloState }: {
   mode: InteractionMode;
   setMode: (mode: InteractionMode) => void;
   holoState: HoloState;
   startVoiceCapture: () => void;
+  isListening: boolean;
   setHoloState: (state: HoloState) => void;
 }) {
   return (
@@ -552,7 +606,7 @@ function VoiceTextPanel({ mode, setMode, holoState, startVoiceCapture, setHoloSt
         </button>
       </div>
       <div className="status-matrix">
-        <SignalCard label="Ouvindo" icon={<Radio size={18} />} active={holoState === "listening"} onClick={startVoiceCapture} />
+        <SignalCard label={isListening ? "Parar escuta" : "Ouvindo"} icon={<Radio size={18} />} active={isListening} onClick={startVoiceCapture} />
         <SignalCard label="Falando" icon={<Volume2 size={18} />} active={holoState === "executing"} onClick={() => setHoloState("executing")} />
         <SignalCard label="Processando" icon={<Cpu size={18} />} active={["thinking", "searching"].includes(holoState)} onClick={() => setHoloState("thinking")} />
         <SignalCard label="Pronto" icon={<CheckCircle2 size={18} />} active={holoState === "idle" || holoState === "done"} onClick={() => setHoloState("idle")} />
@@ -1065,8 +1119,12 @@ function formatBytes(bytes: number) {
 type SpeechRecognitionLike = {
   lang: string;
   interimResults: boolean;
+  continuous: boolean;
   onstart: (() => void) | null;
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onerror: (() => void) | null;
+  onend: (() => void) | null;
   start: () => void;
+  stop: () => void;
+  abort?: () => void;
 };

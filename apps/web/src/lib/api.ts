@@ -190,6 +190,8 @@ export class JarvisApi {
         ...(auth && this.token ? { Authorization: `Bearer ${this.token}` } : {})
       },
       body: init.body ? JSON.stringify(init.body) : undefined
+    }).catch(() => {
+      throw new Error("Nao foi possivel conectar a API Jarvis. Verifique se o servico esta online e liberado no CORS.");
     });
 
     const data = await response.json().catch(() => ({}));

@@ -96,7 +96,7 @@ jarvis-agent
 Instalacao de segundo plano pelo painel:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\agents\windows\install-agent.ps1 -ApiUrl "https://jarvis-api.onrender.com" -PairingCode "123456"
+powershell -ExecutionPolicy Bypass -File .\agents\windows\install-agent.ps1 -ApiUrl "https://jarvis-api-n9wv.onrender.com" -PairingCode "123456"
 ```
 
 Quando o APK Android existir, configure no Render:

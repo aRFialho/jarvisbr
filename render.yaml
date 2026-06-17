@@ -16,7 +16,7 @@ services:
       - key: DEVICE_TOKEN_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://jarvis-web.onrender.com
+        value: https://jarvis-web-9c5d.onrender.com
       - key: ANDROID_APK_URL
         sync: false
       - key: WINDOWS_AGENT_URL
@@ -29,7 +29,7 @@ services:
     staticPublishPath: apps/web/dist
     envVars:
       - key: VITE_API_URL
-        value: https://jarvis-api.onrender.com
+        value: https://jarvis-api-n9wv.onrender.com
 
 # Worker implementado em api/src/workers/worker.ts.
 # Render informa que plan: free nao esta disponivel para background workers.

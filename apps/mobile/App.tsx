@@ -25,7 +25,7 @@ type Permissions = {
   background: boolean;
 };
 
-const apiUrl = "https://jarvis-api.onrender.com";
+const apiUrl = "https://jarvis-api-n9wv.onrender.com";
 
 export default function App() {
   const { width } = useWindowDimensions();

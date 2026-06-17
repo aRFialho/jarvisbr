@@ -55,7 +55,7 @@ type Tab = "chat" | "voice" | "account" | "settings" | "devices" | "install" | "
 type InteractionMode = "voice" | "text";
 
 const sampleCommand = "Jarvis, no computador Casa tem uma imagem chamada logo azul. Baixe ela para mim.";
-const apiUrl = import.meta.env.VITE_API_URL ?? "https://jarvis-api.onrender.com";
+const apiUrl = import.meta.env.VITE_API_URL ?? "https://jarvis-api-n9wv.onrender.com";
 
 const navItems: Array<{ id: Tab; label: string; icon: ReactNode }> = [
   { id: "chat", label: "Chat", icon: <MessageSquare size={18} /> },

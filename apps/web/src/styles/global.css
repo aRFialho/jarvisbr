@@ -1030,6 +1030,459 @@ label {
   box-shadow: 0 0 16px var(--red);
 }
 
+.jarvis-hologram {
+  --audio: 0.42;
+  --jarvis-core: var(--cyan);
+  --jarvis-soft: rgba(37, 244, 255, 0.18);
+  --jarvis-hot: rgba(126, 248, 255, 0.92);
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 38%, rgba(37, 244, 255, 0.22), transparent 24%),
+    radial-gradient(ellipse at 50% 88%, rgba(14, 165, 255, 0.22), transparent 34%),
+    linear-gradient(180deg, rgba(4, 18, 31, 0.88), rgba(1, 7, 13, 0.96)),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 10px);
+  box-shadow:
+    var(--shadow),
+    inset 0 0 72px rgba(37, 244, 255, 0.12),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.jarvis-hologram--success {
+  --jarvis-core: var(--green);
+  --jarvis-soft: rgba(61, 255, 156, 0.2);
+  --jarvis-hot: rgba(137, 255, 190, 0.96);
+}
+
+.jarvis-hologram--error {
+  --jarvis-core: var(--red);
+  --jarvis-soft: rgba(255, 92, 114, 0.16);
+  --jarvis-hot: rgba(255, 146, 160, 0.92);
+}
+
+.jarvis-hologram__backlight {
+  position: absolute;
+  inset: 8% 7% 18%;
+  z-index: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(126, 248, 255, 0.26), transparent 27%),
+    radial-gradient(circle at 50% 58%, var(--jarvis-soft), transparent 48%);
+  filter: blur(18px);
+  opacity: 0.9;
+  animation: jarvisGlowBreath 3.8s ease-in-out infinite;
+}
+
+.jarvis-hologram__particles,
+.jarvis-hologram__data-web {
+  position: absolute;
+  inset: 9% 6% 20%;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+}
+
+.jarvis-hologram__particles span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 999px;
+  background: var(--jarvis-core);
+  box-shadow: 0 0 12px var(--jarvis-core), 0 0 26px rgba(37, 244, 255, 0.24);
+  opacity: 0.42;
+  animation: jarvisParticleRise var(--duration) ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.jarvis-hologram__data-web {
+  inset: 19% 12% 36%;
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+
+.jarvis-hologram__data-web span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--line);
+  height: 1px;
+  transform: rotate(var(--angle));
+  transform-origin: left center;
+  background: linear-gradient(90deg, transparent, var(--jarvis-core), transparent);
+  box-shadow: 0 0 12px var(--jarvis-core);
+  opacity: 0.72;
+  animation: jarvisDataConnect 1.4s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.jarvis-hologram__core {
+  position: absolute;
+  top: 43%;
+  left: 50%;
+  z-index: 3;
+  width: min(88%, 470px);
+  aspect-ratio: 2 / 3;
+  transform: translate(-50%, -48%);
+  filter:
+    drop-shadow(0 0 22px rgba(37, 244, 255, 0.62))
+    drop-shadow(0 0 62px rgba(14, 165, 255, 0.26));
+  animation: jarvisCoreFloat 5.4s ease-in-out infinite;
+}
+
+.jarvis-hologram__image-shell {
+  position: absolute;
+  inset: 2% 0 0;
+  z-index: 2;
+  overflow: hidden;
+  border-radius: 44px;
+  mask-image: linear-gradient(180deg, transparent 0%, black 5%, black 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, black 5%, black 88%, transparent 100%);
+}
+
+.jarvis-hologram__image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  user-select: none;
+  mix-blend-mode: screen;
+  opacity: 0.96;
+  filter:
+    saturate(1.2)
+    contrast(1.1)
+    brightness(1.05)
+    drop-shadow(0 0 12px rgba(126, 248, 255, 0.88))
+    drop-shadow(0 0 34px rgba(14, 165, 255, 0.3));
+  animation: jarvisProjectionFloat 5.4s ease-in-out infinite, jarvisProjectionFlicker 4.6s steps(5, end) infinite;
+}
+
+.jarvis-hologram__scanline,
+.jarvis-hologram__digital-noise {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.jarvis-hologram__scanline {
+  height: 24%;
+  background: linear-gradient(180deg, transparent, rgba(126, 248, 255, 0.42), transparent);
+  mix-blend-mode: screen;
+  opacity: 0.72;
+  transform: translateY(-110%);
+  animation: jarvisScanline 3.2s ease-in-out infinite;
+}
+
+.jarvis-hologram__digital-noise {
+  background:
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 7px),
+    radial-gradient(circle at 50% 35%, transparent 0 35%, rgba(37, 244, 255, 0.08) 36%, transparent 37%);
+  mix-blend-mode: screen;
+  opacity: 0.17;
+  animation: jarvisNoiseShift 900ms steps(2, end) infinite;
+}
+
+.jarvis-hologram__hud,
+.jarvis-hologram__loading-ring,
+.jarvis-hologram__sound-waves span,
+.jarvis-hologram__base-pulse {
+  position: absolute;
+  left: 50%;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+.jarvis-hologram__hud {
+  z-index: 4;
+  border: 1px solid rgba(126, 248, 255, 0.64);
+  box-shadow: 0 0 18px rgba(37, 244, 255, 0.38), inset 0 0 18px rgba(37, 244, 255, 0.08);
+  transform: translateX(-50%) rotateX(64deg);
+  animation: jarvisHudSpin 9s linear infinite;
+}
+
+.jarvis-hologram__hud::before,
+.jarvis-hologram__hud::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid transparent;
+  border-top-color: var(--jarvis-core);
+  border-left-color: rgba(126, 248, 255, 0.28);
+  filter: drop-shadow(0 0 10px var(--jarvis-core));
+}
+
+.jarvis-hologram__hud--outer {
+  top: 22%;
+  width: 82%;
+  height: 30%;
+}
+
+.jarvis-hologram__hud--middle {
+  top: 35%;
+  width: 78%;
+  height: 26%;
+  animation-duration: 7s;
+  animation-direction: reverse;
+}
+
+.jarvis-hologram__hud--inner {
+  top: 72%;
+  width: 70%;
+  height: 20%;
+  border-style: dashed;
+  opacity: 0.78;
+  animation-duration: 5.5s;
+}
+
+.jarvis-hologram__loading-ring {
+  top: 25%;
+  z-index: 5;
+  width: 64%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border: 2px solid transparent;
+  border-top-color: var(--jarvis-core);
+  border-right-color: rgba(126, 248, 255, 0.68);
+  opacity: 0;
+  filter: drop-shadow(0 0 16px var(--jarvis-core));
+}
+
+.jarvis-hologram__sound-waves {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.jarvis-hologram__sound-waves span {
+  top: 33%;
+  width: 34%;
+  aspect-ratio: 1;
+  transform: translateX(-50%) scale(0.55);
+  border: 1px solid var(--jarvis-core);
+  box-shadow: 0 0 24px rgba(37, 244, 255, 0.42), inset 0 0 18px rgba(37, 244, 255, 0.08);
+  opacity: 0;
+}
+
+.jarvis-hologram__sound-waves span:nth-child(2) {
+  animation-delay: 260ms;
+}
+
+.jarvis-hologram__sound-waves span:nth-child(3) {
+  animation-delay: 520ms;
+}
+
+.jarvis-hologram__eye,
+.jarvis-hologram__mouth,
+.jarvis-hologram__base-pulse {
+  z-index: 7;
+  pointer-events: none;
+  background: var(--jarvis-hot);
+  filter: blur(7px) drop-shadow(0 0 16px var(--jarvis-core));
+  mix-blend-mode: screen;
+}
+
+.jarvis-hologram__eye {
+  position: absolute;
+  top: 35.2%;
+  width: 14%;
+  height: 4%;
+  border-radius: 50%;
+  opacity: 0.58;
+  animation: jarvisEyeBlink 5.8s ease-in-out infinite, jarvisEyePulse 2.2s ease-in-out infinite;
+}
+
+.jarvis-hologram__eye--left {
+  left: 34.5%;
+}
+
+.jarvis-hologram__eye--right {
+  right: 34.5%;
+  animation-delay: 120ms, 0ms;
+}
+
+.jarvis-hologram__mouth {
+  position: absolute;
+  left: 50%;
+  top: 46.8%;
+  width: 22%;
+  height: 3.4%;
+  border-radius: 999px;
+  opacity: 0.36;
+  transform: translateX(-50%) scaleX(0.82);
+}
+
+.jarvis-hologram__base-pulse {
+  bottom: 13.2%;
+  width: 42%;
+  height: 6%;
+  transform: translateX(-50%) rotateX(68deg);
+  opacity: 0.42;
+  animation: jarvisBasePulse 2.4s ease-in-out infinite;
+}
+
+.jarvis-hologram__nameplate {
+  position: absolute;
+  left: 50%;
+  bottom: 15.4%;
+  z-index: 8;
+  transform: translateX(-50%);
+  color: #f4fdff;
+  font-family: "Oxanium", system-ui, sans-serif;
+  font-size: clamp(1rem, 2vw, 1.45rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  text-shadow: 0 0 12px rgba(126, 248, 255, 0.88), 0 0 26px rgba(14, 165, 255, 0.38);
+  pointer-events: none;
+}
+
+.jarvis-hologram__success,
+.jarvis-hologram__alert {
+  position: absolute;
+  left: 50%;
+  top: 43%;
+  z-index: 9;
+  display: grid;
+  place-items: center;
+  width: 86px;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%) scale(0.74);
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  background: rgba(2, 8, 15, 0.68);
+  box-shadow: 0 0 22px currentColor, inset 0 0 24px currentColor;
+}
+
+.jarvis-hologram__success {
+  color: var(--green);
+}
+
+.jarvis-hologram__alert {
+  color: var(--red);
+}
+
+.jarvis-hologram__status {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(37, 244, 255, 0.38);
+  border-radius: 999px;
+  background: rgba(3, 13, 23, 0.74);
+  color: #dffbff;
+  padding: 8px 14px;
+  font-family: "Oxanium", system-ui, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  box-shadow: 0 0 18px rgba(37, 244, 255, 0.15), inset 0 0 16px rgba(37, 244, 255, 0.08);
+  backdrop-filter: blur(12px);
+}
+
+.jarvis-hologram__status-dot {
+  width: 8px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--jarvis-core);
+  box-shadow: 0 0 14px var(--jarvis-core);
+  animation: jarvisStatusPulse 1.2s ease-in-out infinite;
+}
+
+.jarvis-hologram__caption {
+  width: min(78%, 430px);
+}
+
+.jarvis-hologram--idle .jarvis-hologram__image {
+  animation-duration: 5.4s, 4.6s;
+}
+
+.jarvis-hologram--listening .jarvis-hologram__hud,
+.jarvis-hologram--speaking .jarvis-hologram__hud {
+  animation-duration: 3.4s;
+}
+
+.jarvis-hologram--listening .jarvis-hologram__eye,
+.jarvis-hologram--speaking .jarvis-hologram__eye {
+  opacity: 0.88;
+  animation: jarvisEyeBlink 4.7s ease-in-out infinite, jarvisEyePulse 780ms ease-in-out infinite;
+}
+
+.jarvis-hologram--listening .jarvis-hologram__base-pulse,
+.jarvis-hologram--speaking .jarvis-hologram__base-pulse {
+  opacity: 0.78;
+  animation-duration: 900ms;
+}
+
+.jarvis-hologram--listening .jarvis-hologram__particles span {
+  animation-duration: var(--fast-duration);
+  opacity: 0.62;
+}
+
+.jarvis-hologram--listening .jarvis-hologram__sound-waves span {
+  animation: jarvisListeningWave 1.35s ease-out infinite;
+}
+
+.jarvis-hologram--speaking .jarvis-hologram__sound-waves span {
+  animation: jarvisSpeakingWave 920ms ease-out infinite;
+}
+
+.jarvis-hologram--speaking .jarvis-hologram__mouth {
+  opacity: 0.9;
+  animation: jarvisMouthTalk 520ms ease-in-out infinite;
+}
+
+.jarvis-hologram--speaking .jarvis-hologram__hud {
+  animation-name: jarvisHudVibrate;
+}
+
+.jarvis-hologram--thinking .jarvis-hologram__loading-ring {
+  opacity: 0.94;
+  animation: jarvisThinkingRing 900ms linear infinite;
+}
+
+.jarvis-hologram--thinking .jarvis-hologram__data-web {
+  opacity: 1;
+}
+
+.jarvis-hologram--thinking .jarvis-hologram__particles span {
+  animation-name: jarvisParticleOrbit;
+  opacity: 0.58;
+}
+
+.jarvis-hologram--success .jarvis-hologram__success {
+  animation: jarvisCheckPop 1.55s ease-out both;
+}
+
+.jarvis-hologram--success .jarvis-hologram__base-pulse,
+.jarvis-hologram--success .jarvis-hologram__mouth {
+  opacity: 0.82;
+}
+
+.jarvis-hologram--error {
+  animation: jarvisErrorFrame 1.8s ease-out both;
+}
+
+.jarvis-hologram--error .jarvis-hologram__alert {
+  animation: jarvisAlertFlash 1.8s ease-out both;
+}
+
+.jarvis-hologram--error .jarvis-hologram__image {
+  animation: jarvisProjectionFloat 5.4s ease-in-out infinite, jarvisErrorFlicker 1.1s steps(3, end) 2;
+}
+
+.jarvis-hologram--error .jarvis-hologram__eye,
+.jarvis-hologram--error .jarvis-hologram__mouth {
+  opacity: 0.72;
+}
+
 .status-strip {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -2548,6 +3001,278 @@ label {
   }
 }
 
+@keyframes jarvisGlowBreath {
+  0%, 100% {
+    opacity: 0.62;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes jarvisParticleRise {
+  0%, 100% {
+    opacity: 0.18;
+    transform: translate3d(0, 18px, 0) scale(0.82);
+  }
+  45% {
+    opacity: 0.72;
+  }
+  100% {
+    transform: translate3d(0, -42px, 0) scale(1.08);
+  }
+}
+
+@keyframes jarvisParticleOrbit {
+  0%, 100% {
+    opacity: 0.24;
+    transform: rotate(0deg) translateX(0) scale(0.88);
+  }
+  50% {
+    opacity: 0.84;
+    transform: rotate(9deg) translateX(16px) scale(1.12);
+  }
+}
+
+@keyframes jarvisDataConnect {
+  0%, 100% {
+    opacity: 0.18;
+    transform: rotate(var(--angle)) scaleX(0.35);
+  }
+  50% {
+    opacity: 0.82;
+    transform: rotate(var(--angle)) scaleX(1);
+  }
+}
+
+@keyframes jarvisCoreFloat {
+  0%, 100% {
+    transform: translate(-50%, -48%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -48%) translateY(-12px);
+  }
+}
+
+@keyframes jarvisProjectionFloat {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.012);
+  }
+}
+
+@keyframes jarvisProjectionFlicker {
+  0%, 100% {
+    opacity: 0.96;
+    filter:
+      saturate(1.2)
+      contrast(1.1)
+      brightness(1.05)
+      drop-shadow(0 0 12px rgba(126, 248, 255, 0.88))
+      drop-shadow(0 0 34px rgba(14, 165, 255, 0.3));
+  }
+  16% {
+    opacity: 0.9;
+  }
+  17%, 62% {
+    opacity: 1;
+  }
+  63% {
+    opacity: 0.92;
+  }
+}
+
+@keyframes jarvisErrorFlicker {
+  0%, 100% {
+    opacity: 0.92;
+    transform: translateY(0);
+  }
+  22% {
+    opacity: 0.58;
+    transform: translateY(1px) translateX(-2px);
+  }
+  25%, 72% {
+    opacity: 1;
+    transform: translateY(-1px) translateX(2px);
+  }
+  74% {
+    opacity: 0.7;
+  }
+}
+
+@keyframes jarvisScanline {
+  0% {
+    transform: translateY(-115%);
+    opacity: 0;
+  }
+  18%, 72% {
+    opacity: 0.72;
+  }
+  100% {
+    transform: translateY(420%);
+    opacity: 0;
+  }
+}
+
+@keyframes jarvisNoiseShift {
+  50% {
+    transform: translateY(2px);
+    opacity: 0.24;
+  }
+}
+
+@keyframes jarvisHudSpin {
+  from {
+    transform: translateX(-50%) rotateX(64deg) rotateZ(0deg);
+  }
+  to {
+    transform: translateX(-50%) rotateX(64deg) rotateZ(360deg);
+  }
+}
+
+@keyframes jarvisHudVibrate {
+  0%, 100% {
+    transform: translateX(-50%) rotateX(64deg) rotateZ(0deg) scale(1);
+  }
+  35% {
+    transform: translateX(-50%) rotateX(64deg) rotateZ(9deg) scale(1.012);
+  }
+  70% {
+    transform: translateX(-50%) rotateX(64deg) rotateZ(-7deg) scale(0.992);
+  }
+}
+
+@keyframes jarvisThinkingRing {
+  from {
+    transform: translateX(-50%) rotate(0deg);
+  }
+  to {
+    transform: translateX(-50%) rotate(360deg);
+  }
+}
+
+@keyframes jarvisListeningWave {
+  0% {
+    opacity: 0.72;
+    transform: translateX(-50%) scale(0.58);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.72);
+  }
+}
+
+@keyframes jarvisSpeakingWave {
+  0% {
+    opacity: 0.64;
+    transform: translateX(-50%) scale(0.42);
+  }
+  55% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.34);
+  }
+}
+
+@keyframes jarvisEyeBlink {
+  0%, 42%, 45%, 100% {
+    transform: scaleY(1);
+  }
+  43%, 44% {
+    transform: scaleY(0.08);
+  }
+}
+
+@keyframes jarvisEyePulse {
+  0%, 100% {
+    box-shadow: 0 0 13px var(--jarvis-core);
+  }
+  50% {
+    box-shadow: 0 0 22px var(--jarvis-core), 0 0 44px var(--jarvis-core);
+  }
+}
+
+@keyframes jarvisMouthTalk {
+  0%, 100% {
+    transform: translateX(-50%) scaleX(0.7) scaleY(0.72);
+  }
+  38% {
+    transform: translateX(-50%) scaleX(1.18) scaleY(1.34);
+  }
+  70% {
+    transform: translateX(-50%) scaleX(0.92) scaleY(0.9);
+  }
+}
+
+@keyframes jarvisBasePulse {
+  0%, 100% {
+    transform: translateX(-50%) rotateX(68deg) scale(0.92);
+    opacity: 0.32;
+  }
+  50% {
+    transform: translateX(-50%) rotateX(68deg) scale(1.12);
+    opacity: 0.78;
+  }
+}
+
+@keyframes jarvisStatusPulse {
+  50% {
+    transform: scale(1.28);
+    opacity: 0.68;
+  }
+}
+
+@keyframes jarvisCheckPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.58);
+  }
+  16%, 68% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.18);
+  }
+}
+
+@keyframes jarvisAlertFlash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  18%, 74% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.92);
+  }
+}
+
+@keyframes jarvisErrorFrame {
+  0%, 100% {
+    box-shadow:
+      var(--shadow),
+      inset 0 0 72px rgba(37, 244, 255, 0.12),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  }
+  35%, 62% {
+    box-shadow:
+      var(--shadow),
+      0 0 28px rgba(255, 92, 114, 0.28),
+      inset 0 0 74px rgba(255, 92, 114, 0.14);
+  }
+}
+
 @media (max-width: 1260px) {
   .jarvis-header {
     grid-template-columns: 1fr;
@@ -2655,6 +3380,23 @@ label {
   .phone-shell {
     width: min(220px, 100%);
   }
+
+  .jarvis-hologram {
+    min-height: 600px;
+  }
+
+  .jarvis-hologram__core {
+    top: 41%;
+    width: min(88vw, 400px);
+  }
+
+  .jarvis-hologram__status {
+    top: 38px;
+  }
+
+  .jarvis-hologram__caption {
+    width: min(86%, 410px);
+  }
 }
 
 @media (max-width: 560px) {
@@ -2686,6 +3428,42 @@ label {
     right: 18px;
   }
 
+  .jarvis-hologram {
+    min-height: 620px;
+  }
+
+  .jarvis-hologram__core {
+    top: 40%;
+    width: min(96vw, 350px);
+  }
+
+  .jarvis-hologram__status {
+    top: 32px;
+    max-width: calc(100% - 32px);
+    justify-content: center;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .jarvis-hologram__caption {
+    left: 50%;
+    right: auto;
+    bottom: 14px;
+    width: calc(100% - 28px);
+    transform: translateX(-50%);
+  }
+
+  .jarvis-hologram__caption p {
+    min-height: 48px;
+    font-size: 0.98rem;
+  }
+
+  .jarvis-hologram__caption .holo-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    width: min(100%, 270px);
+  }
+
   .profile-card {
     grid-template-columns: 1fr;
   }
@@ -2709,5 +3487,15 @@ label {
     position: static;
     transform: none;
     justify-self: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jarvis-hologram *,
+  .jarvis-hologram *::before,
+  .jarvis-hologram *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

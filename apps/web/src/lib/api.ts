@@ -1,6 +1,19 @@
 export type HoloState = "idle" | "listening" | "thinking" | "searching" | "confirming" | "executing" | "done" | "error";
 
-const apiUrl = import.meta.env.VITE_API_URL ?? import.meta.env.NEXT_PUBLIC_API_URL ?? "https://jarvis-api-n9wv.onrender.com";
+const fallbackApiUrl = "https://jarvis-api-n9wv.onrender.com";
+
+function resolveApiUrl(...candidates: Array<string | undefined>) {
+  for (const candidate of candidates) {
+    const normalized = candidate?.trim();
+    if (normalized && /^https?:\/\//i.test(normalized)) {
+      return normalized.replace(/\/+$/, "");
+    }
+  }
+
+  return fallbackApiUrl;
+}
+
+export const jarvisApiUrl = resolveApiUrl(import.meta.env.VITE_API_URL, import.meta.env.NEXT_PUBLIC_API_URL);
 
 export type Device = {
   id: string;
@@ -183,7 +196,7 @@ export class JarvisApi {
   }
 
   private async request<T>(path: string, init: { method?: string; body?: unknown } = {}, auth = true): Promise<T> {
-    const response = await fetch(`${apiUrl}${path}`, {
+    const response = await fetch(`${jarvisApiUrl}${path}`, {
       method: init.method ?? "GET",
       headers: {
         "Content-Type": "application/json",

@@ -18,7 +18,9 @@ export async function buildApp() {
   });
 
   await app.register(cors, {
-    origin: env.corsOrigin === "*" ? true : env.corsOrigin.split(",").map((origin) => origin.trim()),
+    origin: (origin, callback) => {
+      callback(null, isAllowedCorsOrigin(origin));
+    },
     credentials: true
   });
 
@@ -44,4 +46,21 @@ export async function buildApp() {
   await serviceRoutes(app);
 
   return app;
+}
+
+function isAllowedCorsOrigin(origin: string | undefined) {
+  if (!origin) return true;
+  if (env.corsOrigin === "*") return true;
+
+  const configuredOrigins = env.corsOrigin
+    .split(",")
+    .map((allowedOrigin) => allowedOrigin.trim())
+    .filter(Boolean);
+
+  if (configuredOrigins.includes(origin)) return true;
+
+  const developmentOrigin = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+  if (env.nodeEnv !== "production" && developmentOrigin.test(origin)) return true;
+
+  return /^https:\/\/jarvis-web(?:-[a-z0-9]+)?\.onrender\.com$/i.test(origin);
 }

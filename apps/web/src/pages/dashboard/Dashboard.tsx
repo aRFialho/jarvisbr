@@ -364,6 +364,8 @@ export function Dashboard() {
             assistantName={assistantName}
             transcript={message}
             audioLevel={holoState === "listening" ? 0.9 : holoState === "executing" ? 0.7 : 0.42}
+            onVoiceMode={startVoiceCapture}
+            onTextMode={() => setInteractionMode("text")}
           />
           <StatusStrip
             desktopOnline={hasDesktopAgent}

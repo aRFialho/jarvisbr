@@ -54,6 +54,12 @@ import {
 
 type Tab = "chat" | "voice" | "account" | "settings" | "devices" | "install" | "ecosystem" | "health";
 type InteractionMode = "voice" | "text";
+type PendingSearch = {
+  commandId: string;
+  query: string;
+  requestedKind?: string;
+  rawText: string;
+};
 
 const sampleCommand = "Jarvis, no computador Casa tem uma imagem chamada logo azul. Baixe ela para mim.";
 const apiUrl = jarvisApiUrl;
@@ -84,6 +90,7 @@ export function Dashboard() {
   const [installMessage, setInstallMessage] = useState("Agent de segundo plano ainda nao instalado nesta maquina.");
   const [command, setCommand] = useState(sampleCommand);
   const [commandId, setCommandId] = useState("");
+  const [pendingSearch, setPendingSearch] = useState<PendingSearch | null>(null);
   const [results, setResults] = useState<FileResult[]>([]);
   const [selectedFile, setSelectedFile] = useState<FileResult | null>(null);
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
@@ -162,25 +169,98 @@ export function Dashboard() {
   }
 
   async function runCommand() {
+    const rawText = command.trim();
+    if (!rawText) {
+      setHoloState("idle");
+      setMessage("Estou aqui. Envie uma mensagem por texto ou voz.");
+      return;
+    }
+
     try {
       stopVoiceCapture();
       setHoloState("thinking");
-      setMessage(command);
+      setMessage(rawText);
       speak(`${assistantName} analisando o pedido.`);
       setResults([]);
       setSelectedFile(null);
       setConfirmation(null);
 
-      const created = await jarvisApi.createCommand(command);
-      setCommandId(created.command.id);
-      setHoloState("searching");
-      setMessage(`Buscando arquivos parecidos com "${created.interpreted.query}" no aparelho alvo.`);
+      if (pendingSearch) {
+        const targetDevice = resolveMentionedDevice(rawText, devices);
+        if (targetDevice) {
+          await searchFilesForCommand(pendingSearch, targetDevice);
+          return;
+        }
+        if (rawText.includes("@")) {
+          setHoloState("thinking");
+          setMessage("Nao encontrei esse aparelho na sua lista. Tente o nome cadastrado ou escolha pela lista.");
+          return;
+        }
+        setPendingSearch(null);
+      }
 
-      const found = await jarvisApi.searchFiles(created.command.id, created.interpreted.query, created.interpreted.requestedKind);
+      const created = await jarvisApi.createCommand(rawText);
+      setCommandId(created.command.id);
+
+      if (created.interpreted.intent === "conversation") {
+        const reply = created.reply ?? buildConversationReply(rawText, assistantName);
+        setPendingSearch(null);
+        setHoloState("done");
+        setMessage(reply);
+        speak(reply);
+        return;
+      }
+
+      const nextSearch: PendingSearch = {
+        commandId: created.command.id,
+        query: created.interpreted.query,
+        requestedKind: created.interpreted.requestedKind,
+        rawText
+      };
+
+      if (created.interpreted.needsDeviceSelection) {
+        setPendingSearch(nextSearch);
+        setHoloState("thinking");
+        setMessage(`Entendi a busca por "${created.interpreted.query}". Diga o nome do aparelho ou mencione com @.`);
+        speak("Em qual aparelho eu procuro?");
+        return;
+      }
+
+      const targetDevice = created.interpreted.targetDeviceId
+        ? devices.find((device) => device.id === created.interpreted.targetDeviceId) ?? null
+        : null;
+      await searchFilesForCommand(nextSearch, targetDevice, created.interpreted.targetDeviceName);
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  async function searchFilesForCommand(search: PendingSearch, targetDevice?: Device | null, fallbackTargetName?: string | null) {
+    try {
+      setPendingSearch(null);
+      setHoloState("searching");
+      const targetName = targetDevice?.friendly_name ?? fallbackTargetName ?? "aparelho identificado";
+      setMessage(`Buscando arquivos parecidos com "${search.query}" em ${targetName}.`);
+
+      const found = await jarvisApi.searchFiles(search.commandId, search.query, search.requestedKind, targetDevice?.id);
       setResults(found.results);
       setHoloState("confirming");
       setMessage("Encontrei estas opcoes. Escolha visualmente o arquivo correto.");
       speak("Encontrei opcoes parecidas. Escolha o arquivo correto.");
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  async function linkDeviceToPendingSearch(device: Device) {
+    if (!pendingSearch) return;
+    try {
+      stopVoiceCapture();
+      setCommand(insertDeviceMention(pendingSearch.rawText, device));
+      setResults([]);
+      setSelectedFile(null);
+      setConfirmation(null);
+      await searchFilesForCommand(pendingSearch, device);
     } catch (error) {
       showError(error);
     }
@@ -440,6 +520,10 @@ export function Dashboard() {
               interactionMode={interactionMode}
               setInteractionMode={setInteractionMode}
               assistantName={assistantName}
+              assistantMessage={message}
+              devices={devices}
+              pendingSearch={pendingSearch}
+              linkDeviceToPendingSearch={linkDeviceToPendingSearch}
             />
           )}
           {activeTab === "voice" && (
@@ -522,7 +606,28 @@ function ChatPanel(props: {
   interactionMode: InteractionMode;
   setInteractionMode: (mode: InteractionMode) => void;
   assistantName: string;
+  assistantMessage: string;
+  devices: Device[];
+  pendingSearch: PendingSearch | null;
+  linkDeviceToPendingSearch: (device: Device) => void;
 }) {
+  const mentionQuery = getActiveMentionQuery(props.command);
+  const mentionDevices = useMemo(() => {
+    if (mentionQuery === null) return [];
+    const normalizedQuery = normalizeUserText(mentionQuery);
+    return props.devices
+      .filter((device) => !normalizedQuery || normalizeUserText(device.friendly_name).includes(normalizedQuery))
+      .slice(0, 6);
+  }, [mentionQuery, props.devices]);
+
+  function chooseMention(device: Device) {
+    if (props.pendingSearch) {
+      props.linkDeviceToPendingSearch(device);
+      return;
+    }
+    props.setCommand(insertDeviceMention(props.command, device));
+  }
+
   return (
     <div className="tab-panel tab-chat">
       <PanelTitle icon={<Bot size={18} />} title="Chat" subtitle="Comando inteligente com confirmacao segura" />
@@ -534,7 +639,7 @@ function ChatPanel(props: {
           </div>
           <div className="message-row assistant">
             <span>{props.assistantName}</span>
-            <p className="typing-line">Analisando contexto, dispositivos e permissoes...</p>
+            <p>{props.assistantMessage}</p>
           </div>
         </section>
         <section className="mode-switcher">
@@ -554,11 +659,37 @@ function ChatPanel(props: {
         <button className={`orb-button ${props.isListening ? "listening" : ""}`} type="button" aria-label="Capturar voz" onClick={props.startVoiceCapture}>
           <Mic size={22} />
         </button>
-        <textarea value={props.command} onChange={(event) => props.setCommand(event.target.value)} />
+        <div className="command-box">
+          <textarea value={props.command} onChange={(event) => props.setCommand(event.target.value)} />
+          {mentionDevices.length > 0 && (
+            <div className="mention-menu">
+              {mentionDevices.map((device) => (
+                <button type="button" key={device.id} onClick={() => chooseMention(device)}>
+                  <TabletSmartphone size={16} />
+                  <span>
+                    <strong>{device.friendly_name}</strong>
+                    <small>{device.device_type} | {device.status}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button className="primary-button send-button" type="button" onClick={props.runCommand}>
           <Send size={18} /> Enviar
         </button>
       </div>
+      {props.pendingSearch && props.devices.length > 0 && (
+        <div className="device-link-strip">
+          <span>Vincular ultima busca</span>
+          {props.devices.map((device) => (
+            <button type="button" key={device.id} onClick={() => props.linkDeviceToPendingSearch(device)}>
+              <Link2 size={15} />
+              {device.friendly_name}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="results-grid">
         {props.results.map((file, index) => (
           <button
@@ -1100,6 +1231,154 @@ function AmbientField() {
       {Array.from({ length: 28 }, (_, index) => <span key={index} style={{ "--i": index } as CSSProperties} />)}
     </div>
   );
+}
+
+function buildConversationReply(rawText: string, assistantName: string) {
+  const normalized = normalizeUserText(rawText);
+  if (/\b(aprenda|memorize|lembre)\b/.test(normalized)) {
+    return "Aprendido localmente para esta conversa. Quando a API estiver online, essa memoria tambem podera ser registrada no perfil.";
+  }
+  if (/\b(oi|ola|e ai|bom dia|boa tarde|boa noite)\b/.test(normalized)) {
+    return `Ola. ${assistantName} online. Posso conversar, raciocinar e so agir nos aparelhos quando voce pedir claramente.`;
+  }
+  if (/\b(obrigado|obrigada|valeu)\b/.test(normalized)) {
+    return "Fechado. Estou por aqui.";
+  }
+  if (/\b(que horas|hora atual)\b/.test(normalized)) {
+    return `Agora sao ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
+  }
+  if (/\b(que dia|data de hoje|data atual)\b/.test(normalized)) {
+    return `Hoje e ${new Date().toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" })}.`;
+  }
+  const math = solveSimpleMath(rawText);
+  if (math) {
+    return math;
+  }
+  if (/\b(quem e voce|o que voce faz|quem voce e)\b/.test(normalized)) {
+    return `Sou o ${assistantName}, seu assistente para conversar e operar seus aparelhos somente quando o pedido for explicito.`;
+  }
+  if (/\b(ia propria|inteligencia propria|aprendizado de maquina|machine learning|modelo local|sem depender)\b/.test(normalized)) {
+    return "Podemos seguir por camadas: memoria e raciocinio local agora, modelo local opcional depois, e treino fino com dados aprovados quando houver base suficiente.";
+  }
+  if (/\b(o que|quem|qual|quais|quando|onde|como|por que|porque|explique|resuma|me diga|me conte|posso|podemos)\b/.test(normalized)) {
+    return `Boa pergunta. Vou tratar isso como conversa e organizar o raciocinio sobre "${rawText.trim()}"; nao vou acionar arquivo, app ou dispositivo sem um pedido explicito.`;
+  }
+  return "Entendi. Vou tratar isso como conversa por enquanto. Se quiser uma acao real em arquivo, app ou dispositivo, peca explicitamente e eu preparo com confirmacao.";
+}
+
+function solveSimpleMath(rawText: string) {
+  const expression = rawText
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\b(quanto e|calcule|calcular|resolva|resolve|resultado de|qual o resultado de)\b/g, " ")
+    .replace(/[?=]/g, " ")
+    .replace(/,/g, ".")
+    .trim();
+
+  if (!/[0-9]/.test(expression) || !/^[0-9+\-*/().\s]+$/.test(expression) || expression.length > 80) {
+    return null;
+  }
+
+  const result = calculateSimpleExpression(expression);
+  if (result === null) return null;
+  return `O resultado e ${Number.isInteger(result) ? result.toString() : result.toFixed(4).replace(/0+$/g, "").replace(/\.$/, "")}.`;
+}
+
+function calculateSimpleExpression(input: string) {
+  const tokens = input.match(/\d+(?:\.\d+)?|[()+\-*/]/g) ?? [];
+  let index = 0;
+
+  function parseExpression(): number | null {
+    let value = parseTerm();
+    if (value === null) return null;
+    while (tokens[index] === "+" || tokens[index] === "-") {
+      const operator = tokens[index++];
+      const next = parseTerm();
+      if (next === null) return null;
+      value = operator === "+" ? value + next : value - next;
+    }
+    return value;
+  }
+
+  function parseTerm(): number | null {
+    let value = parseFactor();
+    if (value === null) return null;
+    while (tokens[index] === "*" || tokens[index] === "/") {
+      const operator = tokens[index++];
+      const next = parseFactor();
+      if (next === null || (operator === "/" && next === 0)) return null;
+      value = operator === "*" ? value * next : value / next;
+    }
+    return value;
+  }
+
+  function parseFactor(): number | null {
+    const token = tokens[index++];
+    if (!token) return null;
+    if (token === "-") {
+      const value = parseFactor();
+      return value === null ? null : -value;
+    }
+    if (token === "(") {
+      const value = parseExpression();
+      if (tokens[index++] !== ")") return null;
+      return value;
+    }
+    const value = Number(token);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const value = parseExpression();
+  return value !== null && index === tokens.length && Number.isFinite(value) ? value : null;
+}
+
+function resolveMentionedDevice(rawText: string, devices: Device[]) {
+  const normalized = normalizeUserText(rawText);
+  return devices
+    .map((device) => ({ device, score: deviceMentionScore(normalized, device) }))
+    .filter((item) => item.score > 0.55)
+    .sort((a, b) => b.score - a.score)[0]?.device ?? null;
+}
+
+function deviceMentionScore(rawText: string, device: Device) {
+  const name = normalizeUserText(device.friendly_name);
+  const tokens = name.split(/\s+/).filter(Boolean);
+  let score = rawText.includes(name) ? 1.2 : 0;
+  for (const token of tokens) {
+    if (token.length > 2 && rawText.includes(token)) {
+      score += 0.4;
+    }
+  }
+  if (rawText.includes(normalizeUserText(device.device_type))) {
+    score += 0.7;
+  }
+  return score;
+}
+
+function getActiveMentionQuery(value: string) {
+  const match = value.match(/@([\p{Letter}\p{Number} _.-]*)$/u);
+  return match ? match[1].trim() : null;
+}
+
+function insertDeviceMention(value: string, device: Device) {
+  const mention = `@${device.friendly_name} `;
+  if (getActiveMentionQuery(value) !== null) {
+    return value.replace(/@([\p{Letter}\p{Number} _.-]*)$/u, mention);
+  }
+
+  const prefix = value.trimEnd();
+  return `${prefix ? `${prefix} ` : ""}${mention}`;
+}
+
+function normalizeUserText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/[^\p{Letter}\p{Number}\s._-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function speak(text: string) {

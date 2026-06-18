@@ -75,6 +75,15 @@ export type Confirmation = {
   expires_at: string;
 };
 
+export type InterpretedCommand = {
+  intent: "conversation" | "file.search" | "file.download" | "app.prepare" | "browser.prepare";
+  targetDeviceId: string | null;
+  targetDeviceName: string | null;
+  query: string;
+  requestedKind?: string;
+  needsDeviceSelection: boolean;
+};
+
 const emptySettings: Settings = {
   assistant_name: "Jarvis",
   wake_phrases: ["Jarvis"],
@@ -196,7 +205,7 @@ export class JarvisApi {
   }
 
   async createCommand(rawText: string) {
-    const data = await this.request<{ command?: { id: string }; interpreted?: { query: string; requestedKind?: string } }>("/commands", {
+    const data = await this.request<{ command?: { id: string }; interpreted?: InterpretedCommand; reply?: string }>("/commands", {
       method: "POST",
       body: { rawText }
     });
@@ -204,14 +213,21 @@ export class JarvisApi {
     const command = ensureIdentified(data.command, "Comando");
     return {
       command,
-      interpreted: data.interpreted ?? { query: rawText }
+      interpreted: data.interpreted ?? {
+        intent: "conversation",
+        targetDeviceId: null,
+        targetDeviceName: null,
+        query: rawText,
+        needsDeviceSelection: false
+      },
+      reply: typeof data.reply === "string" ? data.reply : undefined
     };
   }
 
-  async searchFiles(commandId: string, query?: string, requestedKind?: string) {
+  async searchFiles(commandId: string, query?: string, requestedKind?: string, targetDeviceId?: string) {
     const data = await this.request<{ results?: FileResult[] }>(`/commands/${commandId}/search-files`, {
       method: "POST",
-      body: { query, requestedKind, limit: 8 }
+      body: { query, requestedKind, targetDeviceId, limit: 8 }
     });
 
     return {

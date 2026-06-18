@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { StatusBar } from "expo-status-bar";
-import { useMemo, useState } from "react";
+import * as Updates from "expo-updates";
+import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   ActivityIndicator,
@@ -35,12 +36,59 @@ export default function App() {
   const [code, setCode] = useState("");
   const [deviceToken, setDeviceToken] = useState("");
   const [message, setMessage] = useState("Encontre seu codigo no Web Control Center.");
+  const [updateStatus, setUpdateStatus] = useState("Sistema atualizado.");
+  const [isUpdating, setIsUpdating] = useState(false);
   const [permissions, setPermissions] = useState({
     accessibility: true,
     notifications: true,
     media: true,
     background: true
   });
+
+  useEffect(() => {
+    void checkForUpdates(false);
+  }, []);
+
+  async function checkForUpdates(manual = true) {
+    if (!Updates.isEnabled) {
+      const unavailableMessage = "Atualizacoes OTA ficam ativas no APK gerado pelo EAS.";
+      setUpdateStatus(unavailableMessage);
+      if (manual) {
+        Alert.alert("Atualizacao Jarvis", unavailableMessage);
+      }
+      return;
+    }
+
+    setIsUpdating(true);
+    setUpdateStatus("Verificando atualizacoes...");
+
+    try {
+      const update = await Updates.checkForUpdateAsync();
+      if (!update.isAvailable) {
+        setUpdateStatus("Sistema atualizado.");
+        if (manual) {
+          Alert.alert("Jarvis atualizado", "Nenhuma atualizacao disponivel agora.");
+        }
+        return;
+      }
+
+      setUpdateStatus("Baixando pacote OTA...");
+      await Updates.fetchUpdateAsync();
+      setUpdateStatus("Atualizacao pronta para aplicar.");
+      Alert.alert("Atualizacao baixada", "Reinicie o app para aplicar a nova versao agora.", [
+        { text: "Depois", style: "cancel" },
+        { text: "Reiniciar", onPress: () => void Updates.reloadAsync() }
+      ]);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Nao foi possivel verificar atualizacoes.";
+      setUpdateStatus(errorMessage);
+      if (manual) {
+        Alert.alert("Atualizacao indisponivel", errorMessage);
+      }
+    } finally {
+      setIsUpdating(false);
+    }
+  }
 
   async function pairDevice() {
     const normalizedCode = code.trim();
@@ -100,7 +148,9 @@ export default function App() {
           }}
         />
       )}
-      {stage === "chat" && <ChatStage />}
+      {stage === "chat" && (
+        <ChatStage updateStatus={updateStatus} isUpdating={isUpdating} onCheckUpdate={() => checkForUpdates()} />
+      )}
     </PhoneSurface>
   );
 
@@ -256,10 +306,18 @@ function PermissionsStage({
   );
 }
 
-function ChatStage() {
+function ChatStage({
+  updateStatus,
+  isUpdating,
+  onCheckUpdate
+}: {
+  updateStatus: string;
+  isUpdating: boolean;
+  onCheckUpdate: () => void;
+}) {
   return (
     <StageShell
-      step="✓"
+      step="OK"
       status="Online"
       icon="chatbubbles-outline"
       tone="green"
@@ -270,7 +328,45 @@ function ChatStage() {
         <Text style={styles.chatEyebrow}>Canal seguro</Text>
         <Text style={styles.chatText}>Web, Desktop Agent e Android sincronizados.</Text>
       </View>
+      <UpdatePanel status={updateStatus} isUpdating={isUpdating} onCheck={onCheckUpdate} />
     </StageShell>
+  );
+}
+
+function UpdatePanel({
+  status,
+  isUpdating,
+  onCheck
+}: {
+  status: string;
+  isUpdating: boolean;
+  onCheck: () => void;
+}) {
+  const channel = Updates.channel ?? "preview";
+  const runtimeVersion = Updates.runtimeVersion ?? "0.1.1";
+  const updateId = Updates.updateId ? Updates.updateId.slice(0, 8) : "embutido";
+
+  return (
+    <View style={styles.updateCard}>
+      <View style={styles.updateHeader}>
+        <Ionicons name="cloud-download-outline" color="#25F4FF" size={22} />
+        <View style={styles.tileCopy}>
+          <Text style={styles.updateTitle}>Atualizacao direta</Text>
+          <Text style={styles.updateStatus}>{status}</Text>
+        </View>
+      </View>
+      <View style={styles.updateMeta}>
+        <Text style={styles.updatePill}>Canal {channel}</Text>
+        <Text style={styles.updatePill}>Runtime {runtimeVersion}</Text>
+        <Text style={styles.updatePill}>Build {updateId}</Text>
+      </View>
+      <PrimaryButton
+        label={isUpdating ? "Verificando..." : "Atualizar app"}
+        icon="refresh"
+        onPress={onCheck}
+        loading={isUpdating}
+      />
+    </View>
   );
 }
 
@@ -619,6 +715,44 @@ const styles = StyleSheet.create({
   chatText: {
     color: "#CDEFFF",
     marginTop: 6
+  },
+  updateCard: {
+    borderWidth: 1,
+    borderColor: "rgba(37,244,255,0.32)",
+    borderRadius: 12,
+    backgroundColor: "rgba(37,244,255,0.07)",
+    padding: 14,
+    gap: 12
+  },
+  updateHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12
+  },
+  updateTitle: {
+    color: "#FFFFFF",
+    fontWeight: "900"
+  },
+  updateStatus: {
+    color: "#9DB7C9",
+    fontSize: 12,
+    marginTop: 2
+  },
+  updateMeta: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6
+  },
+  updatePill: {
+    borderWidth: 1,
+    borderColor: "rgba(37,244,255,0.24)",
+    borderRadius: 999,
+    color: "#BDEEFF",
+    fontSize: 11,
+    fontWeight: "800",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    backgroundColor: "rgba(2,10,18,0.45)"
   },
   tabletPanel: {
     flex: 1,

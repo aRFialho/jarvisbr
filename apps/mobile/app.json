@@ -2,13 +2,22 @@
   "expo": {
     "name": "Jarvis BR",
     "slug": "jarvis-br",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "scheme": "jarvisbr",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a307a762-0281-4feb-a9f9-9dab8c9eb8c4",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "android": {
       "package": "com.jarvisbr.mobile",
+      "versionCode": 2,
       "adaptiveIcon": {
         "backgroundColor": "#02050A"
       }

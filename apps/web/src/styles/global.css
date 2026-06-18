@@ -1691,8 +1691,87 @@ label {
   align-items: stretch;
 }
 
-.command-row textarea {
+.command-box {
+  position: relative;
   flex: 1 1 260px;
+  min-width: 0;
+}
+
+.command-row textarea {
+  min-height: 100%;
+}
+
+.mention-menu {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: grid;
+  gap: 6px;
+  max-height: 240px;
+  overflow: auto;
+  border: 1px solid rgba(37, 244, 255, 0.36);
+  border-radius: 8px;
+  background: rgba(3, 13, 23, 0.96);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.38), 0 0 24px rgba(37, 244, 255, 0.1);
+  padding: 8px;
+}
+
+.mention-menu button,
+.device-link-strip button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid rgba(37, 244, 255, 0.22);
+  border-radius: 8px;
+  background: rgba(37, 244, 255, 0.08);
+  color: #e9f8ff;
+  padding: 9px 10px;
+  text-align: left;
+}
+
+.mention-menu button {
+  width: 100%;
+}
+
+.mention-menu button:hover,
+.device-link-strip button:hover {
+  border-color: var(--line-strong);
+  background: rgba(37, 244, 255, 0.14);
+}
+
+.mention-menu span {
+  display: grid;
+  min-width: 0;
+}
+
+.mention-menu strong,
+.device-link-strip button {
+  overflow-wrap: anywhere;
+}
+
+.mention-menu small {
+  color: var(--muted);
+}
+
+.device-link-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  border: 1px solid rgba(249, 200, 87, 0.26);
+  border-radius: 8px;
+  background: rgba(249, 200, 87, 0.07);
+  padding: 10px;
+}
+
+.device-link-strip > span {
+  color: var(--amber);
+  font-family: "Oxanium", system-ui, sans-serif;
+  font-size: 0.78rem;
+  text-transform: uppercase;
 }
 
 .primary-button,
@@ -3372,6 +3451,7 @@ label {
     grid-template-columns: 58px 1fr;
   }
 
+  .command-box,
   .command-row textarea,
   .send-button {
     grid-column: 1 / -1;

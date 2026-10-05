@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jarvisbr"
+version = "0.1.0"
+description = "Assistente pessoal local-first para Windows, acionado por palmas e voz."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "httpx>=0.27,<1",
+  "numpy>=1.26,<3",
+  "Pillow>=10,<13",
+  "python-dotenv>=1.0,<2",
+  "pyttsx3>=2.90,<3",
+  "sounddevice>=0.5,<1",
+]
+
+[project.optional-dependencies]
+voice = ["faster-whisper>=1.1,<2"]
+dev = ["pytest>=8,<9", "ruff>=0.8,<1"]
+
+[project.scripts]
+jarvisbr = "jarvisbr.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jarvisbr"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100

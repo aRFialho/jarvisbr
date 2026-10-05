@@ -1,137 +1,241 @@
 # Jarvis BR
 
-Assistente pessoal inteligente multidispositivo com API Node.js/Fastify, Neon Postgres com SQL puro, painel holografico React, base mobile Flutter e Agent Windows em Python.
+Assistente pessoal **local-first para Windows**, acionado por palmas e voz.
 
-O projeto foi criado para atuar somente em aparelhos proprios, cadastrados e autorizados. Toda acao sensivel passa por `confirmation_requests`, frase explicita `Confirmo`, token curto de execucao e verificacao tambem no agent local.
+A proposta desta versão é simples: o computador fica escutando um gatilho acústico leve; quando reconhece a sequência, abre uma interação de voz e usa ferramentas locais com uma camada explícita de segurança.
 
-## Stack
+## Gestos
 
-- API: Node.js, TypeScript, Fastify, `pg`, WebSocket.
-- Banco: Neon Postgres, sem Prisma.
-- Migracoes: SQL puro em [api/db/migrations](api/db/migrations).
-- Web: React + Vite com avatar holografico.
-- Mobile: Flutter com `HoloAvatar` em `CustomPainter`.
-- Agent Windows: Python, SQLite, busca fuzzy local e confirmation guard.
+| Gatilho | Ação |
+|---|---|
+| 👏👏 | Conversa / pergunta normal |
+| 👏👏👏 | Modo agente com planejamento de ferramentas |
+| `Ctrl + Alt + J` | Atalho de conversa |
 
-## Deploy Neon + Render
+No modo conversa, comandos simples são resolvidos localmente. Perguntas abertas seguem para o provider configurado.
 
-1. Crie um banco Postgres no Neon.
-2. No Neon, clique em `Connect` e copie a `DATABASE_URL`. Use a string com `sslmode=require`; pooled connection tambem funciona.
-3. No Render, crie um Blueprint apontando para este repositorio. O arquivo [render.yaml](render.yaml) fica na raiz.
-4. Configure a env var `DATABASE_URL` no servico `jarvis-api`.
-5. O Render gera `JWT_SECRET` e `DEVICE_TOKEN_SECRET` automaticamente pelo blueprint.
-6. No primeiro deploy, o comando `preDeployCommand: npm run db:migrate` aplica as migrations SQL direto no Neon.
-7. Ajuste `CORS_ORIGIN` para a URL real do `jarvis-web` quando o Render informar o dominio final.
+No modo agente, o modelo devolve um plano JSON de ferramentas. **O modelo nunca chama o sistema operacional diretamente**: cada ação passa por allowlist, validação de caminho e política de risco antes de executar.
 
-Observacao de custo: a API usa `plan: free` e o web usa static site. O worker foi implementado, mas fica comentado no `render.yaml`, porque o plano gratuito do Render nao esta disponivel para background workers. Nada pago e ativado automaticamente.
+## Arquitetura
 
-Referencias oficiais usadas:
-
-- Render Blueprints: https://render.com/docs/blueprint-spec
-- Render free instances: https://render.com/docs/free
-- Neon connection strings: https://neon.com/docs/connect/connect-from-any-app
-
-## Rodar Local
-
-```bash
-docker compose up -d
+```text
+Microfone
+   │
+   ├── detector de palmas ── 2 palmas ── conversa
+   │                       └─ 3 palmas ── agente
+   │
+   └── Whisper local (STT)
+             │
+             v
+        Dispatcher
+        ├── comandos locais
+        └── provider de IA
+             ├── OpenJarvis local
+             ├── Ollama local
+             ├── Gemini
+             └── Offline
+                  │
+                  v
+              Planner
+                  │
+                  v
+          SecurityPolicy
+          ├── low risk: executa
+          ├── high risk: exige "Confirmo"
+          └── bloqueado: não executa
+                  │
+                  v
+            WindowsTools
 ```
 
-Crie `api/.env` ou `.env` com base em [.env.example](.env.example):
+## O que já funciona
 
-```bash
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/jarvis
-JWT_SECRET=dev-secret
-DEVICE_TOKEN_SECRET=dev-device-secret
-CORS_ORIGIN=http://localhost:5173
+- Detecção de **duas e três palmas** com pico, RMS, crest factor, cadência e cooldown.
+- Reconhecimento de voz local com `faster-whisper`.
+- Resposta falada usando SAPI5/`pyttsx3`.
+- HUD flutuante simples e sempre no topo.
+- Atalho global `Ctrl+Alt+J` usando a API nativa do Windows.
+- Memória de conversas em SQLite local.
+- Provider automático: `OpenJarvis -> Ollama -> Gemini -> offline`.
+- Comandos locais de hora, abrir app/site, volume e screenshot.
+- Modo agente com ações estruturadas.
+- Leitura/escrita de arquivos limitada às pastas configuradas.
+- Shell **desligado por padrão**; quando ligado, ainda exige confirmação e allowlist.
+- Inicialização automática no Windows via `Startup`.
+- Testes de detector de palmas, segurança e roteamento.
+
+## Instalação no Windows
+
+Requisitos:
+
+- Windows 10/11
+- Python 3.11, 3.12 ou 3.13
+- Microfone
+
+Clone o repositório e execute:
+
+```powershell
+git clone https://github.com/aRFialho/jarvisbr.git
+cd jarvisbr
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallOllama -PullModel
 ```
 
-Instale e rode:
+O instalador:
 
-```bash
-npm install
-npm --workspace api run db:migrate
-npm --workspace api run dev
-npm --workspace apps/web run dev
+1. cria `.venv`;
+2. instala Jarvis BR + Whisper;
+3. cria `.env` a partir do exemplo;
+4. detecta a RAM e sugere Qwen 3.5;
+5. opcionalmente instala Ollama e baixa o modelo;
+6. coloca o Jarvis na inicialização do Windows.
+
+Depois rode:
+
+```powershell
+.\.venv\Scripts\jarvisbr.exe doctor
+.\.venv\Scripts\jarvisbr.exe start
 ```
 
-URLs locais:
+## Provider de IA
 
-- API: http://localhost:4000/health
-- Web: http://localhost:5173
+Em `.env`:
 
-## Fluxo Obrigatorio
+```env
+JARVIS_PROVIDER=auto
+```
+
+`auto` tenta nesta ordem:
+
+1. OpenJarvis em `http://127.0.0.1:8000/v1`;
+2. Ollama em `http://127.0.0.1:11434`;
+3. Gemini se houver `GEMINI_API_KEY`;
+4. modo offline.
+
+### OpenJarvis
+
+Se o OpenJarvis estiver rodando localmente com servidor compatível OpenAI, Jarvis BR usa esse endpoint como cérebro:
+
+```env
+JARVIS_PROVIDER=openjarvis
+JARVIS_OPENJARVIS_URL=http://127.0.0.1:8000/v1
+JARVIS_OPENJARVIS_MODEL=qwen3.5:4b
+```
+
+### Ollama
+
+```env
+JARVIS_PROVIDER=ollama
+JARVIS_OLLAMA_MODEL=qwen3.5:4b
+```
+
+### Gemini
+
+```env
+JARVIS_PROVIDER=gemini
+GEMINI_API_KEY=sua-chave
+JARVIS_GEMINI_MODEL=gemini-2.5-flash
+```
+
+## Segurança
+
+Ferramentas de baixo risco podem rodar diretamente:
+
+- `open_app`
+- `open_url`
+- `volume`
+- `screenshot`
+- `read_file` dentro das pastas permitidas
+
+Ferramentas de alto risco exigem confirmação falada **"Confirmo"**:
+
+- `write_file`
+- `run_shell`
+
+O shell ainda vem desabilitado:
+
+```env
+JARVIS_ALLOW_SHELL=false
+```
+
+Para habilitar, é necessário também manter os executáveis desejados na allowlist:
+
+```env
+JARVIS_ALLOW_SHELL=true
+JARVIS_SHELL_ALLOWLIST=python;python.exe;py;git;node;npm;pnpm;uv;ollama
+```
+
+Mesmo no modo agente, ferramentas desconhecidas são rejeitadas.
+
+## Pastas permitidas
+
+Por padrão:
+
+```env
+JARVIS_ALLOWED_DIRS=%USERPROFILE%\Documents;%USERPROFILE%\Downloads;%USERPROFILE%\Desktop
+```
+
+Leitura ou escrita fora dessas raízes é bloqueada.
+
+## Apps permitidos
+
+```env
+JARVIS_APPS=chrome=chrome.exe;edge=msedge.exe;notepad=notepad.exe;calculadora=calc.exe;explorador=explorer.exe;vscode=code;spotify=spotify.exe
+```
 
 Exemplo:
 
-`Jarvis, no computador Casa tem uma imagem chamada logo azul. Baixe ela para mim.`
+> "Abra o Chrome"
 
-O sistema faz:
+O dispatcher não entrega esse pedido ao LLM. Ele resolve localmente e usa apenas a entrada allowlisted.
 
-1. Cria um comando em `POST /commands`.
-2. Identifica o aparelho `Casa` se estiver pareado.
-3. Pede busca ao agent via `/ws/agent`; se o agent nao estiver online, usa cache ou mock seguro marcado.
-4. Mostra opcoes com nome, tipo, tamanho, data, pasta amigavel, score e thumbnail token.
-5. Ao escolher um arquivo, cria `confirmation_request`.
-6. O usuario precisa digitar/falar `Confirmo`.
-7. A API cria `executionToken` curto e envia `action.execute` ao agent autorizado.
-8. O agent chama `/agent/execution/verify` antes de qualquer ferramenta local.
-9. Auditoria registra criacao, busca, confirmacao, execucao, bloqueio ou cancelamento.
+## Ajuste das palmas
 
-## Agent Windows
+Os principais parâmetros ficam no `.env`:
 
-Depois de criar conta no painel web, abra a aba `Instalar Agent`, gere a chave temporaria e execute o comando PowerShell exibido. O agent usa `/devices/claim` para receber `JARVIS_DEVICE_TOKEN`, instala uma tarefa de segundo plano no Windows e tenta baixar o APK Android quando `ANDROID_APK_URL` estiver configurado no Render.
-
-```bash
-cd agents/windows
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .[dev]
-set JARVIS_API_URL=http://localhost:4000
-set JARVIS_DEVICE_TOKEN=cole-o-token
-set JARVIS_ALLOWED_DIRS=C:\Users\seu-usuario\Downloads;C:\Users\seu-usuario\Pictures
-jarvis-agent
+```env
+JARVIS_CLAP_THRESHOLD=0.24
+JARVIS_CLAP_SPIKE_RATIO=3.5
+JARVIS_CLAP_MAX_RMS=0.18
+JARVIS_CLAP_MIN_GAP=0.12
+JARVIS_CLAP_MAX_GAP=0.95
+JARVIS_CLAP_SETTLE=0.55
 ```
 
-Instalacao de segundo plano pelo painel:
+Se sons comuns estiverem ativando o Jarvis, aumente `JARVIS_CLAP_THRESHOLD` ou `JARVIS_CLAP_SPIKE_RATIO`.
+
+Se suas palmas não forem reconhecidas, reduza `JARVIS_CLAP_THRESHOLD` aos poucos, por exemplo para `0.20`.
+
+## Teste sem microfone
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\agents\windows\install-agent.ps1 -ApiUrl "https://jarvis-api-n9wv.onrender.com" -PairingCode "123456"
+.\.venv\Scripts\jarvisbr.exe text "que horas são?"
+.\.venv\Scripts\jarvisbr.exe text --agent "abra o chrome"
 ```
 
-Quando o APK Android existir, configure no Render:
+## Desenvolvimento
 
-```text
-ANDROID_APK_URL=https://seu-dominio/jarvisbr-android.apk
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -e ".[dev,voice]"
+pytest -q
+python -m compileall -q src
 ```
 
-O instalador salva o APK em:
+## Direção do projeto
 
-```text
-%USERPROFILE%\.jarvis-agent\downloads\jarvisbr-android.apk
-```
+A versão anterior do repositório misturava API cloud, Postgres, dashboard web, mobile e agent remoto. A reconstrução atual reduz deliberadamente o escopo para tornar o núcleo Windows realmente utilizável primeiro.
 
-No Android, a primeira tela pede o codigo de vinculacao gerado na aba `Aparelhos`. Depois disso o app ja entra vinculado a conta.
+Próximas evoluções naturais:
 
-## Garantias
+- voiceprint opcional do proprietário;
+- wake word offline além das palmas;
+- tray icon;
+- integrações Spotify/Calendar/e-mail;
+- habilidades plugáveis;
+- automações agendadas via OpenJarvis;
+- instalador `.exe`.
 
-- Nao existe Prisma no repositorio.
-- Migrations sao SQL puro.
-- A API bloqueia execucao sem confirmacao.
-- O agent tambem bloqueia sem token validado no backend.
-- Nada tenta burlar senha, permissao, WhatsApp, conta, sistema ou aparelho de terceiros.
-- Arquivos reais ficam no aparelho ate uma transferencia aprovada.
+## Referências de design
 
-## Testes
-
-```bash
-npm --workspace api run test
-cd agents/windows
-pytest
-```
-
-## Proximas fases naturais
-
-1. Conectar upload por chunks em `agents/windows/jarvis_agent/transfer.py`.
-2. Adicionar STT/TTS real nos adapters de voz.
-3. Publicar app Android com permissao transparente para botao flutuante e wake word opcional.
+A detecção de palmas e a experiência Windows foram estudadas em projetos públicos como `rsg28/jarvis`; o projeto OpenJarvis é suportado como backend opcional por API. Consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -69,16 +69,25 @@ class Settings:
     input_device: int | str | None = field(default_factory=_input_device)
 
     clap_threshold: float = field(
-        default_factory=lambda: _float("JARVIS_CLAP_THRESHOLD", 0.14)
+        default_factory=lambda: _float("JARVIS_CLAP_THRESHOLD", 0.04)
     )
     clap_spike_ratio: float = field(
-        default_factory=lambda: _float("JARVIS_CLAP_SPIKE_RATIO", 2.4)
+        default_factory=lambda: _float("JARVIS_CLAP_SPIKE_RATIO", 1.8)
     )
-    clap_max_rms: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_RMS", 0.32))
+    clap_max_rms: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_RMS", 0.40))
     clap_min_gap: float = field(default_factory=lambda: _float("JARVIS_CLAP_MIN_GAP", 0.12))
     clap_max_gap: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_GAP", 0.95))
     clap_settle: float = field(default_factory=lambda: _float("JARVIS_CLAP_SETTLE", 0.45))
     clap_cooldown: float = field(default_factory=lambda: _float("JARVIS_CLAP_COOLDOWN", 1.8))
+    clap_high_freq_ratio: float = field(
+        default_factory=lambda: _float("JARVIS_CLAP_HIGH_FREQ_RATIO", 0.16)
+    )
+    clap_max_event_ms: float = field(
+        default_factory=lambda: _float("JARVIS_CLAP_MAX_EVENT_MS", 240.0)
+    )
+    clap_attack_ratio: float = field(
+        default_factory=lambda: _float("JARVIS_CLAP_ATTACK_RATIO", 2.0)
+    )
 
     provider: str = field(default_factory=lambda: os.getenv("JARVIS_PROVIDER", "auto").lower())
     openjarvis_url: str = field(

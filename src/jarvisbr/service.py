@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import time
 import threading
 import unicodedata
 from collections.abc import Callable
@@ -107,6 +108,8 @@ class JarvisService:
         self.on_state(AssistantState.LISTENING)
         self._say("Modo agente." if agent_mode else "Sim, Mestre?")
         self.on_state(AssistantState.LISTENING)
+        # Evita que o final da própria voz do Jarvis seja confundido com o usuário.
+        time.sleep(0.35)
         samples = self.recorder.record_utterance()
         if samples.size == 0:
             self._say("Não ouvi nenhum comando.")
@@ -132,6 +135,7 @@ class JarvisService:
         self.on_state(AssistantState.CONFIRMING)
         self._say(f"Confirma {description}? Diga: confirmo.")
         self.on_state(AssistantState.LISTENING)
+        time.sleep(0.35)
         samples = self.recorder.record_utterance()
         answer = (
             self.stt.transcribe(samples, self.recorder.samplerate)

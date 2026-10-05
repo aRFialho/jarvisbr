@@ -131,7 +131,13 @@ JARVIS_OPENJARVIS_MODEL=qwen3.5:4b
 ```env
 JARVIS_PROVIDER=ollama
 JARVIS_OLLAMA_MODEL=qwen3.5:4b
+JARVIS_OLLAMA_THINK=false
+JARVIS_OLLAMA_NUM_CTX=4096
+JARVIS_OLLAMA_NUM_PREDICT=256
+JARVIS_OLLAMA_KEEP_ALIVE=15m
 ```
+
+Para voz, o Jarvis desliga o thinking do Qwen 3.5 por padrão para reduzir muito a latência. Em PCs com menos de 10 GB de RAM, o instalador prefere `qwen3.5:0.8b`; de 10 a 14 GB, `qwen3.5:2b`.
 
 ### Gemini
 

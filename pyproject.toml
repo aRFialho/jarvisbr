@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-voice = ["faster-whisper>=1.1,<2"]
+voice = ["faster-whisper>=1.1,<2", "av<19"]
 dev = ["pytest>=8,<9", "ruff>=0.8,<1"]
 
 [project.scripts]

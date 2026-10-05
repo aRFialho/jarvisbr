@@ -45,7 +45,11 @@ class JarvisService:
         )
         self.listener = ClapListener(detector, device=settings.input_device)
         self.recorder = MicrophoneRecorder(device=settings.input_device)
-        self.stt = WhisperSTT(settings.whisper_model, settings.language)
+        self.stt = WhisperSTT(
+            settings.whisper_model,
+            settings.language,
+            on_status=self.on_text,
+        )
         self.tts = WindowsTTS(settings.tts_rate, settings.language)
         self.assistant = Assistant(settings, self._confirm)
         self.hotkey = WindowsHotkey(
@@ -108,13 +112,14 @@ class JarvisService:
             self._say("Não ouvi nenhum comando.")
             return
 
-        self.on_state(AssistantState.THINKING)
+        self.on_state(AssistantState.TRANSCRIBING)
         text = self.stt.transcribe(samples, self.recorder.samplerate)
         if not text:
             self._say("Não consegui entender.")
             return
 
         self.on_text(f"Você: {text}")
+        self.on_state(AssistantState.THINKING)
         reply = self.assistant.handle(text, agent_mode=agent_mode)
         self.on_text(f"Jarvis: {reply}")
         self._say(reply)

@@ -29,6 +29,11 @@ def _parser() -> argparse.ArgumentParser:
     )
     voice_test.add_argument("--agent", action="store_true", help="Usa modo agente")
 
+    sub.add_parser(
+        "voice-prepare",
+        help="Baixa/carrega o modelo Whisper antecipadamente",
+    )
+
     sub.add_parser("doctor", help="Verifica ambiente, microfone e provider")
     sub.add_parser("audio-devices", help="Lista todas as entradas de áudio")
 
@@ -306,6 +311,18 @@ def main() -> int:
     if command == "text":
         service = JarvisService(settings)
         print(service.handle_text(args.prompt, agent_mode=args.agent))
+        return 0
+
+    if command == "voice-prepare":
+        from jarvisbr.stt import WhisperSTT
+
+        stt = WhisperSTT(
+            settings.whisper_model,
+            settings.language,
+            on_status=print,
+        )
+        stt.prepare()
+        print("Reconhecimento de voz preparado.")
         return 0
 
     if command == "voice-test":

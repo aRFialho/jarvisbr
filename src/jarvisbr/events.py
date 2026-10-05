@@ -13,6 +13,7 @@ class Gesture(str, Enum):
 class AssistantState(str, Enum):
     IDLE = "idle"
     LISTENING = "listening"
+    TRANSCRIBING = "transcribing"
     THINKING = "thinking"
     SPEAKING = "speaking"
     CONFIRMING = "confirming"

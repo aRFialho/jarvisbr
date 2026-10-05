@@ -150,6 +150,17 @@ if ($LASTEXITCODE -ne 0) {
 
 if (-not (Test-Path ".env")) {
   Copy-Item ".env.example" ".env"
+} else {
+  # Migra apenas os defaults antigos conhecidos, preservando ajustes personalizados.
+  $ExistingEnv = Get-Content ".env" -Raw
+  if ($ExistingEnv -notmatch "(?m)^JARVIS_INPUT_DEVICE=") {
+    $ExistingEnv = $ExistingEnv -replace "(?m)^# Gatilhos\\s*$", "# Áudio`r`n# Vazio = entrada padrão do Windows. Também aceita índice ou parte do nome.`r`nJARVIS_INPUT_DEVICE=`r`n`r`n# Gatilhos"
+  }
+  $ExistingEnv = $ExistingEnv -replace "(?m)^JARVIS_CLAP_THRESHOLD=0\\.24\\s*$", "JARVIS_CLAP_THRESHOLD=0.14"
+  $ExistingEnv = $ExistingEnv -replace "(?m)^JARVIS_CLAP_SPIKE_RATIO=3\\.5\\s*$", "JARVIS_CLAP_SPIKE_RATIO=2.4"
+  $ExistingEnv = $ExistingEnv -replace "(?m)^JARVIS_CLAP_MAX_RMS=0\\.18\\s*$", "JARVIS_CLAP_MAX_RMS=0.32"
+  $ExistingEnv = $ExistingEnv -replace "(?m)^JARVIS_CLAP_SETTLE=0\\.55\\s*$", "JARVIS_CLAP_SETTLE=0.45"
+  Set-Content ".env" $ExistingEnv -Encoding UTF8
 }
 
 $OllamaExe = Resolve-OllamaExecutable

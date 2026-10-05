@@ -108,8 +108,9 @@ class JarvisService:
         self.on_state(AssistantState.LISTENING)
         self._say("Modo agente." if agent_mode else "Sim, Mestre?")
         self.on_state(AssistantState.LISTENING)
-        # Evita que o final da própria voz do Jarvis seja confundido com o usuário.
-        time.sleep(0.35)
+        # Pequena folga para o TTS terminar. O gravador mantém pré-buffer,
+        # então a resposta natural do usuário não perde o começo.
+        time.sleep(0.12)
         samples = self.recorder.record_utterance()
         if samples.size == 0:
             self._say("Não ouvi nenhum comando.")
@@ -135,7 +136,7 @@ class JarvisService:
         self.on_state(AssistantState.CONFIRMING)
         self._say(f"Confirma {description}? Diga: confirmo.")
         self.on_state(AssistantState.LISTENING)
-        time.sleep(0.35)
+        time.sleep(0.12)
         samples = self.recorder.record_utterance()
         answer = (
             self.stt.transcribe(samples, self.recorder.samplerate)

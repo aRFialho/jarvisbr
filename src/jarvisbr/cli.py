@@ -54,7 +54,8 @@ def _device_label(device, index: int) -> str:
             flags.append("SELECIONADO")
 
     suffix = f"  <{'/'.join(flags)}>" if flags else ""
-    return f"[{index:2}] {device['name']} | entradas={device['max_input_channels']}{suffix}"
+    rate = int(float(device.get("default_samplerate", 0) or 0))
+    return f"[{index:2}] {device['name']} | entradas={device['max_input_channels']} | {rate} Hz{suffix}"
 
 
 def _list_audio_devices() -> int:
@@ -101,7 +102,10 @@ def _mic_test(seconds: float, raw_device=None) -> int:
         print("Rode: jarvisbr audio-devices")
         return 1
 
+    native_rate = int(float(info.get("default_samplerate", 16000) or 16000))
+    blocksize = max(128, int(native_rate * 0.016))
     print(f"Microfone: {info['name']}")
+    print(f"Taxa nativa: {native_rate} Hz | bloco: {blocksize} amostras")
     print("Teste BRUTO: fale por 2 s e depois faça 3 palmas.")
     print("Nenhum filtro/classificador é usado aqui.")
     print()
@@ -122,8 +126,8 @@ def _mic_test(seconds: float, raw_device=None) -> int:
         with sd.InputStream(
             device=device,
             channels=1,
-            samplerate=16000,
-            blocksize=256,
+            samplerate=native_rate,
+            blocksize=blocksize,
             dtype="float32",
             callback=callback,
         ):

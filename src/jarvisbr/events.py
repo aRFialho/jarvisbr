@@ -7,6 +7,7 @@ class Gesture(str, Enum):
     DOUBLE_CLAP = "double_clap"
     TRIPLE_CLAP = "triple_clap"
     HOTKEY = "hotkey"
+    HOTKEY_AGENT = "hotkey_agent"
 
 
 class AssistantState(str, Enum):

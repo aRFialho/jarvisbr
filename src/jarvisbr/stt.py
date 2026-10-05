@@ -89,9 +89,32 @@ class WhisperSTT:
             language=self.language,
             vad_filter=True,
             beam_size=3,
+            temperature=0.0,
+            condition_on_previous_text=False,
+            no_speech_threshold=0.60,
+            log_prob_threshold=-1.0,
+            compression_ratio_threshold=2.4,
         )
-        return " ".join(
-            segment.text.strip()
-            for segment in segments
-            if segment.text.strip()
-        ).strip()
+
+        accepted: list[str] = []
+        for segment in segments:
+            text = segment.text.strip()
+            if not text:
+                continue
+
+            no_speech_prob = float(
+                getattr(segment, "no_speech_prob", 0.0) or 0.0
+            )
+            avg_logprob = float(
+                getattr(segment, "avg_logprob", 0.0) or 0.0
+            )
+
+            # Combinação conservadora: se o próprio Whisper diz que há grande
+            # chance de não haver fala e a confiança textual também é baixa,
+            # descartamos o segmento em vez de inventar uma frase.
+            if no_speech_prob >= 0.60 and avg_logprob <= -0.80:
+                continue
+
+            accepted.append(text)
+
+        return " ".join(accepted).strip()

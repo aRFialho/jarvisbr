@@ -118,10 +118,12 @@ def _clap_test(seconds: float) -> int:
         metrics = detector.metrics(block)
         now = time.monotonic()
         candidate = detector.is_clap(metrics.peak, metrics.rms)
+        previous_hit = detector.last_hit_at
         gesture = detector.feed_metrics(metrics.peak, metrics.rms, now)
+        accepted_hit = detector.last_hit_at != previous_hit
 
-        should_report = candidate or gesture is not None
-        if metrics.peak >= 0.04 and now - last_report >= 0.18:
+        should_report = accepted_hit or gesture is not None
+        if metrics.peak >= max(detector.threshold * 0.8, 0.02) and now - last_report >= 0.20:
             should_report = True
 
         if should_report:
@@ -131,7 +133,7 @@ def _clap_test(seconds: float) -> int:
                     metrics.peak,
                     metrics.rms,
                     metrics.crest,
-                    candidate,
+                    accepted_hit,
                     gesture,
                     detector.count,
                 )
@@ -149,10 +151,10 @@ def _clap_test(seconds: float) -> int:
         ):
             while time.monotonic() < end:
                 try:
-                    peak, rms, crest, candidate, gesture, count = messages.get(timeout=0.1)
+                    peak, rms, crest, accepted_hit, gesture, count = messages.get(timeout=0.1)
                 except queue.Empty:
                     continue
-                tag = "CLAP" if candidate else "som "
+                tag = "BATIDA" if accepted_hit else "som   "
                 print(
                     f"{tag} peak={peak:.3f} rms={rms:.3f} crest={crest:.2f} sequência={count}",
                     flush=True,

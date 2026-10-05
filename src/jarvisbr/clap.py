@@ -21,6 +21,8 @@ class ClapMetrics:
 
 
 class ClapSequenceDetector:
+    """Detecta sequências de palmas tratando cada impacto físico como um único evento."""
+
     def __init__(
         self,
         threshold: float = 0.14,
@@ -31,6 +33,8 @@ class ClapSequenceDetector:
         settle: float = 0.45,
         cooldown: float = 1.8,
         refractory: float = 0.06,
+        rearm_seconds: float = 0.08,
+        release_ratio: float = 0.55,
     ) -> None:
         self.threshold = threshold
         self.spike_ratio = spike_ratio
@@ -40,10 +44,19 @@ class ClapSequenceDetector:
         self.settle = settle
         self.cooldown = cooldown
         self.refractory = refractory
+        self.rearm_seconds = rearm_seconds
+        self.release_ratio = release_ratio
+
         self.count = 0
         self.first_at = 0.0
         self.last_at = 0.0
         self.cool_until = 0.0
+
+        # Um impacto de palma ocupa vários blocos de áudio. Depois de aceitar
+        # um impacto, o detector desarma até o sinal voltar perto do silêncio.
+        self.armed = True
+        self.quiet_since = 0.0
+        self.last_hit_at = 0.0
 
     @staticmethod
     def metrics(block: np.ndarray) -> ClapMetrics:
@@ -55,10 +68,16 @@ class ClapSequenceDetector:
             float(np.sqrt(np.mean(np.square(data)))),
         )
 
-    def reset(self) -> None:
+    def reset_sequence(self) -> None:
         self.count = 0
         self.first_at = 0.0
         self.last_at = 0.0
+
+    def reset(self) -> None:
+        self.reset_sequence()
+        self.armed = True
+        self.quiet_since = 0.0
+        self.last_hit_at = 0.0
 
     def is_clap(self, peak: float, rms: float) -> bool:
         crest = peak / max(rms, 1e-6)
@@ -68,23 +87,67 @@ class ClapSequenceDetector:
             and crest >= self.spike_ratio
         )
 
+    def _release_levels(self) -> tuple[float, float]:
+        # Pequenos pisos evitam que thresholds muito baixos tornem impossível
+        # rearmar o detector em microfones com ruído digital residual.
+        peak_release = max(self.threshold * self.release_ratio, 0.003)
+        rms_release = max(self.threshold * self.release_ratio * 0.65, 0.0015)
+        return peak_release, rms_release
+
+    def _update_rearm(self, peak: float, rms: float, now: float) -> None:
+        if self.armed:
+            return
+
+        peak_release, rms_release = self._release_levels()
+        quiet = peak <= peak_release and rms <= rms_release
+
+        if not quiet:
+            self.quiet_since = 0.0
+            return
+
+        if self.quiet_since == 0.0:
+            self.quiet_since = now
+            return
+
+        if now - self.quiet_since >= self.rearm_seconds:
+            self.armed = True
+            self.quiet_since = 0.0
+
     def feed_metrics(self, peak: float, rms: float, now: float) -> Gesture | None:
         if now < self.cool_until:
             return None
 
+        # Finaliza a sequência depois que houve tempo suficiente para uma
+        # possível terceira palma.
         if self.count >= 2 and now - self.last_at >= self.settle:
-            gesture = Gesture.TRIPLE_CLAP if self.count >= 3 else Gesture.DOUBLE_CLAP
-            self.reset()
+            gesture = (
+                Gesture.TRIPLE_CLAP
+                if self.count >= 3
+                else Gesture.DOUBLE_CLAP
+            )
+            self.reset_sequence()
             self.cool_until = now + self.cooldown
             return gesture
 
+        self._update_rearm(peak, rms, now)
+
+        if not self.armed:
+            if self.count and now - self.last_at > self.max_gap + self.settle:
+                self.reset_sequence()
+            return None
+
         if not self.is_clap(peak, rms):
             if self.count and now - self.last_at > self.max_gap + self.settle:
-                self.reset()
+                self.reset_sequence()
             return None
 
         if self.last_at and now - self.last_at < self.refractory:
             return None
+
+        # Aceita exatamente um evento e desarma até o áudio voltar ao silêncio.
+        self.armed = False
+        self.quiet_since = 0.0
+        self.last_hit_at = now
 
         if self.count == 0:
             self.count = 1

@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import os
-import tempfile
-import wave
 from collections.abc import Callable
-from pathlib import Path
 
 import numpy as np
 
@@ -13,6 +10,8 @@ StatusCallback = Callable[[str], None]
 
 
 class WhisperSTT:
+    TARGET_SAMPLE_RATE = 16000
+
     def __init__(
         self,
         model_name: str = "small",
@@ -28,8 +27,6 @@ class WhisperSTT:
         if self._model is not None:
             return self._model
 
-        # Esse warning é apenas uma limitação de cache no Windows sem symlinks.
-        # O download/cache continua funcionando normalmente.
         os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
         try:
@@ -54,34 +51,47 @@ class WhisperSTT:
     def prepare(self) -> None:
         self._load()
 
-    @staticmethod
-    def _write_wav(samples: np.ndarray, samplerate: int, path: Path) -> None:
-        pcm16 = (np.clip(samples, -1.0, 1.0) * 32767.0).astype(np.int16)
-        with wave.open(str(path), "wb") as wf:
-            wf.setnchannels(1)
-            wf.setsampwidth(2)
-            wf.setframerate(samplerate)
-            wf.writeframes(pcm16.tobytes())
+    @classmethod
+    def _resample_to_model_rate(
+        cls,
+        samples: np.ndarray,
+        samplerate: int,
+    ) -> np.ndarray:
+        data = np.asarray(samples, dtype=np.float32).reshape(-1)
+        if data.size == 0:
+            return data
+        if samplerate <= 0:
+            raise ValueError("Taxa de amostragem inválida")
+        if samplerate == cls.TARGET_SAMPLE_RATE:
+            return np.ascontiguousarray(data, dtype=np.float32)
+
+        output_size = max(
+            1,
+            int(round(data.size * cls.TARGET_SAMPLE_RATE / samplerate)),
+        )
+        source_positions = np.arange(data.size, dtype=np.float64)
+        target_positions = np.linspace(
+            0.0,
+            float(data.size - 1),
+            output_size,
+            dtype=np.float64,
+        )
+        resampled = np.interp(target_positions, source_positions, data)
+        return np.ascontiguousarray(resampled, dtype=np.float32)
 
     def transcribe(self, samples: np.ndarray, samplerate: int = 16000) -> str:
         if samples.size == 0:
             return ""
 
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-            path = Path(tmp.name)
-
-        try:
-            self._write_wav(samples, samplerate, path)
-            segments, _ = self._load().transcribe(
-                str(path),
-                language=self.language,
-                vad_filter=True,
-                beam_size=3,
-            )
-            return " ".join(
-                segment.text.strip()
-                for segment in segments
-                if segment.text.strip()
-            ).strip()
-        finally:
-            path.unlink(missing_ok=True)
+        audio = self._resample_to_model_rate(samples, samplerate)
+        segments, _ = self._load().transcribe(
+            audio,
+            language=self.language,
+            vad_filter=True,
+            beam_size=3,
+        )
+        return " ".join(
+            segment.text.strip()
+            for segment in segments
+            if segment.text.strip()
+        ).strip()

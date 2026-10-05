@@ -39,6 +39,9 @@ class JarvisService:
             max_gap=settings.clap_max_gap,
             settle=settings.clap_settle,
             cooldown=settings.clap_cooldown,
+            high_freq_ratio=settings.clap_high_freq_ratio,
+            max_event_ms=settings.clap_max_event_ms,
+            attack_ratio=settings.clap_attack_ratio,
         )
         self.listener = ClapListener(detector, device=settings.input_device)
         self.recorder = MicrophoneRecorder(device=settings.input_device)

@@ -23,6 +23,13 @@ def _float(name: str, default: float) -> float:
         return default
 
 
+def _int(name: str, default: int) -> int:
+    try:
+        return int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+
+
 def _split(name: str, default: str = "") -> list[str]:
     raw = os.getenv(name, default)
     return [item.strip() for item in raw.split(";") if item.strip()]
@@ -102,6 +109,21 @@ class Settings:
     )
     ollama_model: str = field(
         default_factory=lambda: os.getenv("JARVIS_OLLAMA_MODEL", "qwen3.5:4b")
+    )
+    ollama_think: bool = field(
+        default_factory=lambda: _bool("JARVIS_OLLAMA_THINK", False)
+    )
+    ollama_num_ctx: int = field(
+        default_factory=lambda: _int("JARVIS_OLLAMA_NUM_CTX", 4096)
+    )
+    ollama_num_predict: int = field(
+        default_factory=lambda: _int("JARVIS_OLLAMA_NUM_PREDICT", 256)
+    )
+    ollama_timeout: float = field(
+        default_factory=lambda: _float("JARVIS_OLLAMA_TIMEOUT", 45.0)
+    )
+    ollama_keep_alive: str = field(
+        default_factory=lambda: os.getenv("JARVIS_OLLAMA_KEEP_ALIVE", "15m")
     )
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
     gemini_model: str = field(

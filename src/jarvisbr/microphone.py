@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import queue
 import time
+from collections import deque
 
 import numpy as np
 
@@ -15,8 +16,9 @@ class MicrophoneRecorder:
         silence_seconds: float = 1.0,
         wait_for_speech: float = 3.5,
         max_seconds: float = 12.0,
-        calibration_seconds: float = 0.25,
-        speech_multiplier: float = 3.0,
+        calibration_seconds: float = 0.20,
+        speech_multiplier: float = 2.4,
+        preroll_seconds: float = 0.50,
         device: int | str | None = None,
     ) -> None:
         self.samplerate = samplerate
@@ -27,6 +29,7 @@ class MicrophoneRecorder:
         self.max_seconds = max_seconds
         self.calibration_seconds = calibration_seconds
         self.speech_multiplier = speech_multiplier
+        self.preroll_seconds = preroll_seconds
         self.device = device
         self.last_threshold = speech_rms
         self.last_noise_rms = 0.0
@@ -48,10 +51,12 @@ class MicrophoneRecorder:
         self.samplerate = rate
         self.blocksize = blocksize
 
-        started = time.monotonic()
+        blocks_per_second = rate / blocksize
+        preroll_blocks = max(1, int(round(self.preroll_seconds * blocks_per_second)))
+        preroll: deque[np.ndarray] = deque(maxlen=preroll_blocks)
+
         calibration_rms: list[float] = []
         heard = False
-        last_voice = started
         captured: list[np.ndarray] = []
 
         with sd.InputStream(
@@ -62,19 +67,20 @@ class MicrophoneRecorder:
             dtype="float32",
             callback=callback,
         ):
-            # Primeiro mede apenas o piso ambiente. Isso também absorve qualquer
-            # pequeno rastro do TTS que ainda tenha ficado no ambiente.
-            calibration_end = started + self.calibration_seconds
+            # Calibra pelo piso mais baixo do ambiente, não pela mediana.
+            # Se o usuário começar a falar imediatamente, a fala não "vira ruído".
+            calibration_end = time.monotonic() + self.calibration_seconds
             while time.monotonic() < calibration_end:
                 try:
-                    block = chunks.get(timeout=0.15)
+                    block = chunks.get(timeout=0.12)
                 except queue.Empty:
                     continue
+                preroll.append(block)
                 rms = float(np.sqrt(np.mean(np.square(block))))
                 calibration_rms.append(rms)
 
             noise_rms = (
-                float(np.median(calibration_rms))
+                float(np.percentile(calibration_rms, 20))
                 if calibration_rms
                 else 0.0
             )
@@ -95,9 +101,19 @@ class MicrophoneRecorder:
                     continue
 
                 rms = float(np.sqrt(np.mean(np.square(block))))
+
+                if not heard:
+                    preroll.append(block)
+
                 if rms >= threshold:
-                    heard = True
+                    if not heard:
+                        heard = True
+                        captured.extend(list(preroll))
+                        preroll.clear()
+                    else:
+                        captured.append(block)
                     last_voice = time.monotonic()
+                    continue
 
                 if heard:
                     captured.append(block)
@@ -110,11 +126,11 @@ class MicrophoneRecorder:
             return np.empty(0, dtype=np.float32)
 
         audio = np.concatenate(captured).astype(np.float32, copy=False)
-
-        # Uma captura extremamente curta ou quase silenciosa não é uma fala.
         duration = audio.size / max(rate, 1)
         overall_rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
-        if duration < 0.20 or overall_rms < threshold * 0.45:
+
+        # Conservador, mas sem descartar frases curtas reais.
+        if duration < 0.25 or overall_rms < max(self.speech_rms * 0.8, threshold * 0.30):
             return np.empty(0, dtype=np.float32)
 
         return audio

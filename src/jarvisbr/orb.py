@@ -4,7 +4,7 @@ import queue
 import tkinter as tk
 from jarvisbr.events import AssistantState
 
-STATE_LABEL={AssistantState.IDLE:"AGUARDANDO 👏👏",AssistantState.LISTENING:"OUVINDO",AssistantState.THINKING:"PROCESSANDO",AssistantState.SPEAKING:"FALANDO",AssistantState.CONFIRMING:"CONFIRMAÇÃO",AssistantState.ERROR:"ERRO"}
+STATE_LABEL={AssistantState.IDLE:"AGUARDANDO ATALHO",AssistantState.LISTENING:"OUVINDO",AssistantState.THINKING:"PROCESSANDO",AssistantState.SPEAKING:"FALANDO",AssistantState.CONFIRMING:"CONFIRMAÇÃO",AssistantState.ERROR:"ERRO"}
 
 class OrbWindow:
     def __init__(self,on_close)->None:
@@ -22,7 +22,7 @@ class OrbWindow:
         self.phase=(self.phase+1)%100;pulse=(self.phase if self.phase<=50 else 100-self.phase)/50;audio=min(self.level*350,1.0);radius=58+10*pulse+18*audio;cx=cy=130;self.canvas.delete("all")
         for extra in (34,22,10):
             r=radius+extra;self.canvas.create_oval(cx-r,cy-r,cx+r,cy+r,outline="#10384d",width=1)
-        self.canvas.create_oval(cx-radius,cy-radius,cx+radius,cy+radius,outline="#67d8ff",width=3);inner=max(22,radius*0.58);self.canvas.create_oval(cx-inner,cy-inner,cx+inner,cy+inner,fill="#0a2533",outline="#8de7ff",width=2);self.canvas.create_text(cx,cy-6,text="JARVIS",fill="#d8f7ff",font=("Segoe UI",17,"bold"));self.canvas.create_text(cx,cy+21,text=STATE_LABEL[self.state],fill="#6bcfea",font=("Segoe UI",8,"bold"));self.canvas.create_text(cx,239,text="CTRL+ALT+J  •  botão direito fecha",fill="#477486",font=("Segoe UI",7));self.root.after(33,self._tick)
+        self.canvas.create_oval(cx-radius,cy-radius,cx+radius,cy+radius,outline="#67d8ff",width=3);inner=max(22,radius*0.58);self.canvas.create_oval(cx-inner,cy-inner,cx+inner,cy+inner,fill="#0a2533",outline="#8de7ff",width=2);self.canvas.create_text(cx,cy-6,text="JARVIS",fill="#d8f7ff",font=("Segoe UI",17,"bold"));self.canvas.create_text(cx,cy+21,text=STATE_LABEL[self.state],fill="#6bcfea",font=("Segoe UI",8,"bold"));self.canvas.create_text(cx,239,text="CTRL+ALT+J conversa  •  CTRL+ALT+K agente",fill="#477486",font=("Segoe UI",7));self.root.after(33,self._tick)
     def _drag_start(self,event)->None:self._drag=(event.x,event.y)
     def _drag_move(self,event)->None:self.root.geometry(f"+{self.root.winfo_x()+event.x-self._drag[0]}+{self.root.winfo_y()+event.y-self._drag[1]}")
     def close(self)->None:self.on_close();self.root.destroy()

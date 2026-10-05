@@ -107,8 +107,8 @@ def _clap_test(seconds: float) -> int:
         f"threshold={detector.threshold:.2f} "
         f"crest>={detector.spike_ratio:.2f} "
         f"max_rms={detector.max_rms:.2f} "
-        f"hf>={detector.high_freq_ratio:.2f} "
-        f"evento<={detector.max_event_ms:.0f}ms"
+        f"ataque>={detector.attack_ratio:.2f} "
+        f"release={detector.release_ratio:.2f}"
     )
     print("Faça duas palmas, aguarde 2 segundos, depois faça três palmas.")
     print("Os picos aparecerão abaixo. Ctrl+C encerra.")
@@ -141,12 +141,10 @@ def _clap_test(seconds: float) -> int:
                 except queue.Empty:
                     continue
                 if event is not None:
-                    tag = "PALMA " if event.accepted else "REJEIT"
+                    tag = "IMPACTO" if event.accepted else "REJEIT "
                     print(
-                        f"{tag} dur={event.duration_ms:.0f}ms "
-                        f"peak={event.peak:.3f} rms={event.rms:.3f} "
-                        f"crest={event.crest:.2f} hf={event.high_ratio:.2f} "
-                        f"zcr={event.zcr:.2f} ataque={event.attack_ratio:.1f} "
+                        f"{tag} peak={event.peak:.3f} rms={event.rms:.3f} "
+                        f"crest={event.crest:.2f} ataque={event.attack_ratio:.1f} "
                         f"seq={count} motivo={event.reason}",
                         flush=True,
                     )

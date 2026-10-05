@@ -32,11 +32,21 @@ def _expand(path: str) -> Path:
     return Path(os.path.expandvars(os.path.expanduser(path))).resolve()
 
 
+def _input_device() -> int | str | None:
+    raw = os.getenv("JARVIS_INPUT_DEVICE", "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return raw
+
+
 def _apps() -> dict[str, str]:
     raw = os.getenv(
         "JARVIS_APPS",
-        "chrome=chrome.exe;edge=msedge.exe;notepad=notepad.exe;calculadora=calc.exe;"
-        "explorador=explorer.exe;vscode=code;spotify=spotify.exe",
+        "chrome=chrome.exe;edge=msedge.exe;bloco de notas=notepad.exe;notepad=notepad.exe;"
+        "calculadora=calc.exe;explorador=explorer.exe;vscode=code;spotify=spotify.exe",
     )
     result: dict[str, str] = {}
     for item in raw.split(";"):
@@ -56,17 +66,18 @@ class Settings:
     whisper_model: str = field(
         default_factory=lambda: os.getenv("JARVIS_WHISPER_MODEL", "small")
     )
+    input_device: int | str | None = field(default_factory=_input_device)
 
     clap_threshold: float = field(
-        default_factory=lambda: _float("JARVIS_CLAP_THRESHOLD", 0.24)
+        default_factory=lambda: _float("JARVIS_CLAP_THRESHOLD", 0.14)
     )
     clap_spike_ratio: float = field(
-        default_factory=lambda: _float("JARVIS_CLAP_SPIKE_RATIO", 3.5)
+        default_factory=lambda: _float("JARVIS_CLAP_SPIKE_RATIO", 2.4)
     )
-    clap_max_rms: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_RMS", 0.18))
+    clap_max_rms: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_RMS", 0.32))
     clap_min_gap: float = field(default_factory=lambda: _float("JARVIS_CLAP_MIN_GAP", 0.12))
     clap_max_gap: float = field(default_factory=lambda: _float("JARVIS_CLAP_MAX_GAP", 0.95))
-    clap_settle: float = field(default_factory=lambda: _float("JARVIS_CLAP_SETTLE", 0.55))
+    clap_settle: float = field(default_factory=lambda: _float("JARVIS_CLAP_SETTLE", 0.45))
     clap_cooldown: float = field(default_factory=lambda: _float("JARVIS_CLAP_COOLDOWN", 1.8))
 
     provider: str = field(default_factory=lambda: os.getenv("JARVIS_PROVIDER", "auto").lower())

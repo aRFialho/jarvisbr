@@ -69,8 +69,10 @@ Microfone
 Requisitos:
 
 - Windows 10/11
-- Python 3.11, 3.12 ou 3.13
 - Microfone
+- `winget` recomendado para instalação automática de dependências
+
+Se Python 3.11, 3.12 ou 3.13 não estiver instalado, o instalador tenta instalar **Python 3.12 automaticamente pelo winget**.
 
 Clone o repositório e execute:
 
@@ -82,12 +84,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -InstallOllama -P
 
 O instalador:
 
-1. cria `.venv`;
-2. instala Jarvis BR + Whisper;
-3. cria `.env` a partir do exemplo;
-4. detecta a RAM e sugere Qwen 3.5;
-5. opcionalmente instala Ollama e baixa o modelo;
-6. coloca o Jarvis na inicialização do Windows.
+1. localiza Python 3.11-3.13 ou instala Python 3.12 automaticamente;
+2. cria uma `.venv` limpa;
+3. instala Jarvis BR + Whisper;
+4. cria `.env` a partir do exemplo;
+5. detecta a RAM e sugere Qwen 3.5;
+6. opcionalmente instala/localiza Ollama e baixa o modelo sem depender de reiniciar o PowerShell;
+7. coloca o Jarvis na inicialização do Windows.
 
 Depois rode:
 

@@ -29,6 +29,10 @@ def _parser() -> argparse.ArgumentParser:
     clap_test = sub.add_parser("clap-test", help="Mostra em tempo real o que o detector de palmas ouve")
     clap_test.add_argument("--seconds", type=float, default=20.0, help="Duração do teste")
 
+    mic_test = sub.add_parser("mic-test", help="Mede o áudio bruto sem classificador")
+    mic_test.add_argument("--device", help="Índice ou parte do nome do dispositivo")
+    mic_test.add_argument("--seconds", type=float, default=8.0, help="Duração do teste")
+
     return parser
 
 
@@ -73,6 +77,75 @@ def _list_audio_devices() -> int:
     print("JARVIS_INPUT_DEVICE=3")
     print("ou use parte do nome:")
     print("JARVIS_INPUT_DEVICE=Microphone")
+    return 0
+
+
+def _resolve_test_device(raw):
+    if raw is None:
+        return settings.input_device
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return raw
+
+
+def _mic_test(seconds: float, raw_device=None) -> int:
+    import numpy as np
+    import sounddevice as sd
+
+    device = _resolve_test_device(raw_device)
+    try:
+        info = sd.query_devices(device, "input")
+    except Exception as exc:
+        print(f"Não consegui abrir a entrada: {exc}")
+        print("Rode: jarvisbr audio-devices")
+        return 1
+
+    print(f"Microfone: {info['name']}")
+    print("Teste BRUTO: fale por 2 s e depois faça 3 palmas.")
+    print("Nenhum filtro/classificador é usado aqui.")
+    print()
+
+    q = queue.Queue()
+    max_peak = 0.0
+    max_rms = 0.0
+    last_print = 0.0
+
+    def callback(indata, frames, time_info, status):
+        block = np.asarray(indata[:, 0], dtype=np.float32)
+        peak = float(np.max(np.abs(block))) if block.size else 0.0
+        rms = float(np.sqrt(np.mean(np.square(block)))) if block.size else 0.0
+        q.put((time.monotonic(), peak, rms))
+
+    end = time.monotonic() + max(3.0, seconds)
+    try:
+        with sd.InputStream(
+            device=device,
+            channels=1,
+            samplerate=16000,
+            blocksize=256,
+            dtype="float32",
+            callback=callback,
+        ):
+            while time.monotonic() < end:
+                try:
+                    ts, peak, rms = q.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                max_peak = max(max_peak, peak)
+                max_rms = max(max_rms, rms)
+                if ts - last_print >= 0.12 and (peak >= 0.01 or rms >= 0.004):
+                    last_print = ts
+                    bars = min(40, int(peak * 80))
+                    print(f"peak={peak:0.3f} rms={rms:0.3f} | {'#' * bars}", flush=True)
+    except KeyboardInterrupt:
+        pass
+    except Exception as exc:
+        print(f"Falha ao abrir microfone: {exc}")
+        return 1
+
+    print()
+    print(f"MÁXIMO: peak={max_peak:0.3f} rms={max_rms:0.3f}")
     return 0
 
 
@@ -179,6 +252,9 @@ def main() -> int:
 
     if command == "clap-test":
         return _clap_test(args.seconds)
+
+    if command == "mic-test":
+        return _mic_test(args.seconds, args.device)
 
     if command == "text":
         service = JarvisService(settings)

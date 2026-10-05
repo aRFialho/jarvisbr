@@ -1,79 +1,101 @@
+import numpy as np
+
 from jarvisbr.clap import ClapSequenceDetector
 from jarvisbr.events import Gesture
 
 
 def detector():
     return ClapSequenceDetector(
-        threshold=0.2,
-        spike_ratio=3.0,
-        max_rms=0.15,
+        threshold=0.04,
+        spike_ratio=1.6,
+        max_rms=0.6,
         min_gap=0.1,
         max_gap=0.9,
-        settle=0.5,
+        settle=0.4,
         cooldown=1.0,
-        rearm_seconds=0.08,
+        high_freq_ratio=0.10,
+        max_event_ms=220,
+        min_event_ms=10,
+        attack_ratio=1.5,
+        release_ms=30,
     )
 
 
-def quiet_rearm(d, start):
-    d.feed_metrics(0.01, 0.005, start)
-    d.feed_metrics(0.01, 0.005, start + 0.09)
+def impulse_block(amp=0.8, size=256):
+    x = np.zeros(size, dtype=np.float32)
+    x[10] = amp
+    x[11] = -amp * 0.8
+    x[12] = amp * 0.5
+    x[20] = -amp * 0.35
+    return x
 
 
-def test_double_clap_waits_then_emits():
+def quiet_block(size=256):
+    return np.zeros(size, dtype=np.float32)
+
+
+def voice_like_block(size=256, sr=16000, amp=0.18):
+    t = np.arange(size, dtype=np.float32) / sr
+    return (
+        amp * np.sin(2 * np.pi * 180 * t)
+        + amp * 0.35 * np.sin(2 * np.pi * 360 * t)
+        + amp * 0.15 * np.sin(2 * np.pi * 720 * t)
+    ).astype(np.float32)
+
+
+def finish_event(d, start):
+    d.feed_block(quiet_block(), start + 0.05)
+    d.feed_block(quiet_block(), start + 0.09)
+
+
+def test_impulse_is_accepted_as_one_clap():
     d = detector()
-    assert d.feed_metrics(0.7, 0.08, 1.0) is None
-    quiet_rearm(d, 1.05)
-    assert d.feed_metrics(0.7, 0.08, 1.3) is None
-    quiet_rearm(d, 1.35)
-    assert d.feed_metrics(0.01, 0.01, 1.81) == Gesture.DOUBLE_CLAP
+    d.feed_block(impulse_block(), 1.0)
+    finish_event(d, 1.0)
+    assert d.last_event is not None
+    assert d.last_event.accepted
+    assert d.count == 1
 
 
-def test_triple_clap_becomes_agent_mode():
+def test_sustained_voice_is_rejected():
     d = detector()
-    d.feed_metrics(0.7, 0.08, 1.0)
-    quiet_rearm(d, 1.05)
-    d.feed_metrics(0.7, 0.08, 1.3)
-    quiet_rearm(d, 1.35)
-    d.feed_metrics(0.7, 0.08, 1.6)
-    quiet_rearm(d, 1.65)
-    assert d.feed_metrics(0.01, 0.01, 2.11) == Gesture.TRIPLE_CLAP
-
-
-def test_sustained_audio_is_not_a_clap():
-    d = detector()
-    assert d.feed_metrics(0.4, 0.25, 1.0) is None
+    start = 1.0
+    for i in range(20):
+        d.feed_block(voice_like_block(), start + i * 0.016)
+    finish_event(d, start + 0.32)
+    assert d.last_event is not None
+    assert not d.last_event.accepted
     assert d.count == 0
 
 
-def test_one_physical_hit_spanning_many_blocks_counts_once():
+def test_double_clap_emits_conversation():
     d = detector()
-    assert d.feed_metrics(0.7, 0.08, 1.00) is None
-    assert d.count == 1
 
-    # Mesmo impacto decaindo ao longo de vários blocos.
-    for t, peak, rms in [
-        (1.02, 0.65, 0.09),
-        (1.04, 0.50, 0.08),
-        (1.06, 0.35, 0.06),
-        (1.08, 0.25, 0.04),
-    ]:
-        assert d.feed_metrics(peak, rms, t) is None
-        assert d.count == 1
+    d.feed_block(impulse_block(), 1.0)
+    finish_event(d, 1.0)
+
+    d.feed_block(impulse_block(), 1.30)
+    finish_event(d, 1.30)
+
+    result = d.feed_block(quiet_block(), 1.80)
+    assert result == Gesture.DOUBLE_CLAP
 
 
-def test_requires_quiet_period_before_counting_next_hit():
+def test_triple_clap_emits_agent():
     d = detector()
-    d.feed_metrics(0.7, 0.08, 1.0)
 
-    # Dois blocos baixos, mas ainda menos que 80 ms de silêncio.
-    d.feed_metrics(0.01, 0.005, 1.05)
-    d.feed_metrics(0.01, 0.005, 1.10)
-    d.feed_metrics(0.7, 0.08, 1.12)
+    for start in (1.0, 1.25, 1.50):
+        d.feed_block(impulse_block(), start)
+        finish_event(d, start)
+
+    result = d.feed_block(quiet_block(), 2.0)
+    assert result == Gesture.TRIPLE_CLAP
+
+
+def test_one_long_impact_does_not_count_multiple_times():
+    d = detector()
+    start = 1.0
+    for i, amp in enumerate((0.8, 0.7, 0.55, 0.4, 0.25)):
+        d.feed_block(impulse_block(amp), start + i * 0.016)
+    finish_event(d, start + 0.08)
     assert d.count == 1
-
-    # Agora desarma/arma corretamente e aceita a próxima batida.
-    d.feed_metrics(0.01, 0.005, 1.20)
-    d.feed_metrics(0.01, 0.005, 1.29)
-    d.feed_metrics(0.7, 0.08, 1.40)
-    assert d.count == 2

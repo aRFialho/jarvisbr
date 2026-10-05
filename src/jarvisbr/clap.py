@@ -36,23 +36,29 @@ class ClapEvent:
 
 
 class ClapSequenceDetector:
-    """Detector de palmas baseado em eventos acústicos curtos e transientes."""
+    """Detecta 2x/3x impactos acústicos por ataque + vale relativo de energia.
+
+    Alguns notebooks com Intel Smart Sound/AGC não retornam silêncio absoluto
+    entre palmas. Por isso o detector rearma quando o sinal cai em relação ao
+    próprio impacto anterior, em vez de esperar amplitude quase zero.
+    """
 
     def __init__(
         self,
         threshold: float = 0.04,
-        spike_ratio: float = 1.8,
-        max_rms: float = 0.40,
+        spike_ratio: float = 1.55,
+        max_rms: float = 0.55,
         min_gap: float = 0.12,
         max_gap: float = 0.95,
         settle: float = 0.45,
         cooldown: float = 1.8,
-        refractory: float = 0.06,
-        high_freq_ratio: float = 0.16,
-        max_event_ms: float = 240.0,
-        min_event_ms: float = 12.0,
-        attack_ratio: float = 2.0,
-        release_ms: float = 55.0,
+        refractory: float = 0.08,
+        high_freq_ratio: float = 0.0,
+        max_event_ms: float = 320.0,
+        min_event_ms: float = 0.0,
+        attack_ratio: float = 1.65,
+        release_ms: float = 32.0,
+        release_ratio: float = 0.48,
     ) -> None:
         self.threshold = threshold
         self.spike_ratio = spike_ratio
@@ -67,6 +73,7 @@ class ClapSequenceDetector:
         self.min_event_ms = min_event_ms
         self.attack_ratio = attack_ratio
         self.release_ms = release_ms
+        self.release_ratio = release_ratio
 
         self.count = 0
         self.first_at = 0.0
@@ -74,16 +81,14 @@ class ClapSequenceDetector:
         self.cool_until = 0.0
 
         self.noise_rms = 0.003
-        self.event_active = False
-        self.event_rejected = False
-        self.event_start = 0.0
-        self.event_quiet_since = 0.0
-        self.event_noise_rms = self.noise_rms
-        self.event_peak = 0.0
-        self.event_rms = 0.0
-        self.event_crest = 0.0
-        self.event_high = 0.0
-        self.event_zcr = 0.0
+        self.prev_rms = 0.003
+        self.prev_peak = 0.003
+
+        self.armed = True
+        self.hit_peak = 0.0
+        self.hit_rms = 0.0
+        self.hit_started = 0.0
+        self.release_since = 0.0
 
         self.last_event: ClapEvent | None = None
         self.event_serial = 0
@@ -108,9 +113,8 @@ class ClapSequenceDetector:
             freqs = np.fft.rfftfreq(centered.size, d=1.0 / samplerate)
             useful = (freqs >= 250.0) & (freqs <= min(7500.0, samplerate / 2.0))
             high = (freqs >= 1800.0) & useful
-            total_energy = float(np.sum(spectrum[useful]))
-            high_energy = float(np.sum(spectrum[high]))
-            high_ratio = high_energy / max(total_energy, 1e-12)
+            total = float(np.sum(spectrum[useful]))
+            high_ratio = float(np.sum(spectrum[high])) / max(total, 1e-12)
         else:
             high_ratio = 0.0
 
@@ -121,71 +125,16 @@ class ClapSequenceDetector:
         self.first_at = 0.0
         self.last_at = 0.0
 
-    def _start_event(self, metrics: ClapMetrics, now: float) -> None:
-        self.event_active = True
-        self.event_rejected = False
-        self.event_start = now
-        self.event_quiet_since = 0.0
-        self.event_noise_rms = max(self.noise_rms, 0.001)
-        self.event_peak = metrics.peak
-        self.event_rms = metrics.rms
-        self.event_crest = metrics.crest
-        self.event_high = metrics.high_ratio
-        self.event_zcr = metrics.zcr
+    def _maybe_emit_sequence(self, now: float) -> Gesture | None:
+        if self.count >= 2 and now - self.last_at >= self.settle:
+            gesture = Gesture.TRIPLE_CLAP if self.count >= 3 else Gesture.DOUBLE_CLAP
+            self.reset_sequence()
+            self.cool_until = now + self.cooldown
+            return gesture
 
-    def _accumulate_event(self, metrics: ClapMetrics) -> None:
-        self.event_peak = max(self.event_peak, metrics.peak)
-        self.event_rms = max(self.event_rms, metrics.rms)
-        self.event_crest = max(self.event_crest, metrics.crest)
-        self.event_high = max(self.event_high, metrics.high_ratio)
-        self.event_zcr = max(self.event_zcr, metrics.zcr)
-
-    def _release_levels(self) -> tuple[float, float]:
-        peak_release = max(self.threshold * 0.35, 0.010)
-        rms_release = max(self.noise_rms * 2.2, self.threshold * 0.12, 0.004)
-        return peak_release, rms_release
-
-    def _finish_event(self, now: float) -> bool:
-        duration_ms = max(0.0, (now - self.event_start) * 1000.0)
-        attack = self.event_rms / max(self.event_noise_rms, 1e-4)
-
-        reasons: list[str] = []
-        if duration_ms < self.min_event_ms:
-            reasons.append("curto demais")
-        if duration_ms > self.max_event_ms:
-            reasons.append("sustentado/fala")
-        if self.event_peak < self.threshold:
-            reasons.append("pico baixo")
-        if self.event_rms > self.max_rms:
-            reasons.append("RMS alto")
-        if self.event_crest < self.spike_ratio:
-            reasons.append("pouco impulsivo")
-        if self.event_high < self.high_freq_ratio:
-            reasons.append("pouca alta frequência")
-        if attack < self.attack_ratio:
-            reasons.append("ataque fraco")
-        if self.event_rejected:
-            reasons.append("evento longo")
-
-        accepted = not reasons
-        event = ClapEvent(
-            accepted=accepted,
-            duration_ms=duration_ms,
-            peak=self.event_peak,
-            rms=self.event_rms,
-            crest=self.event_crest,
-            high_ratio=self.event_high,
-            zcr=self.event_zcr,
-            attack_ratio=attack,
-            reason="ok" if accepted else ", ".join(dict.fromkeys(reasons)),
-        )
-        self.last_event = event
-        self.event_serial += 1
-
-        self.event_active = False
-        self.event_rejected = False
-        self.event_quiet_since = 0.0
-        return accepted
+        if self.count and now - self.last_at > self.max_gap + self.settle:
+            self.reset_sequence()
+        return None
 
     def _register_hit(self, now: float) -> None:
         self.last_hit_at = now
@@ -202,16 +151,44 @@ class ClapSequenceDetector:
             self.count = 1
             self.first_at = self.last_at = now
 
-    def _maybe_emit_sequence(self, now: float) -> Gesture | None:
-        if self.count >= 2 and now - self.last_at >= self.settle:
-            gesture = Gesture.TRIPLE_CLAP if self.count >= 3 else Gesture.DOUBLE_CLAP
-            self.reset_sequence()
-            self.cool_until = now + self.cooldown
-            return gesture
+    def _record_event(
+        self,
+        accepted: bool,
+        metrics: ClapMetrics,
+        attack: float,
+        reason: str,
+        now: float,
+    ) -> None:
+        duration_ms = max(0.0, (now - self.hit_started) * 1000.0) if self.hit_started else 0.0
+        self.last_event = ClapEvent(
+            accepted=accepted,
+            duration_ms=duration_ms,
+            peak=metrics.peak,
+            rms=metrics.rms,
+            crest=metrics.crest,
+            high_ratio=metrics.high_ratio,
+            zcr=metrics.zcr,
+            attack_ratio=attack,
+            reason=reason,
+        )
+        self.event_serial += 1
 
-        if self.count and now - self.last_at > self.max_gap + self.settle:
-            self.reset_sequence()
-        return None
+    def _onset_candidate(self, metrics: ClapMetrics) -> tuple[bool, float, str]:
+        local_floor = max(self.noise_rms, self.prev_rms * 0.72, 0.001)
+        attack = metrics.rms / max(local_floor, 1e-4)
+        peak_rise = metrics.peak / max(self.prev_peak, self.threshold * 0.20, 1e-4)
+
+        reasons: list[str] = []
+        if metrics.peak < self.threshold:
+            reasons.append("pico baixo")
+        if metrics.rms > self.max_rms:
+            reasons.append("RMS alto")
+        if metrics.crest < self.spike_ratio:
+            reasons.append("pouco impulsivo")
+        if attack < self.attack_ratio and peak_rise < self.attack_ratio:
+            reasons.append("sem ataque brusco")
+
+        return not reasons, max(attack, peak_rise), ", ".join(reasons) or "ok"
 
     def feed_block(
         self,
@@ -223,41 +200,58 @@ class ClapSequenceDetector:
         metrics = self.metrics(block, samplerate)
 
         if current < self.cool_until:
+            self.prev_rms = metrics.rms
+            self.prev_peak = metrics.peak
             return None
 
         gesture = self._maybe_emit_sequence(current)
         if gesture is not None:
             return gesture
 
-        if not self.event_active:
-            if metrics.peak < self.threshold:
-                # EMA lenta do piso de ruído enquanto não há evento.
-                self.noise_rms = 0.97 * self.noise_rms + 0.03 * min(metrics.rms, self.threshold)
-                return None
+        if self.armed:
+            accepted, attack, reason = self._onset_candidate(metrics)
+            if accepted:
+                self.armed = False
+                self.hit_peak = max(metrics.peak, self.threshold)
+                self.hit_rms = max(metrics.rms, 0.001)
+                self.hit_started = current
+                self.release_since = 0.0
+                self._register_hit(current)
+                self._record_event(True, metrics, attack, "impacto aceito", current)
+            elif metrics.peak >= self.threshold:
+                # Diagnóstico útil sem poluir com cada bloco de silêncio.
+                self._record_event(False, metrics, attack, reason, current)
 
-            self._start_event(metrics, current)
-            return None
-
-        self._accumulate_event(metrics)
-        duration_ms = (current - self.event_start) * 1000.0
-        if duration_ms > self.max_event_ms:
-            self.event_rejected = True
-
-        peak_release, rms_release = self._release_levels()
-        quiet = metrics.peak <= peak_release and metrics.rms <= rms_release
-
-        if quiet:
-            if self.event_quiet_since == 0.0:
-                self.event_quiet_since = current
-            elif (current - self.event_quiet_since) * 1000.0 >= self.release_ms:
-                accepted = self._finish_event(current)
-                if accepted:
-                    self._register_hit(current)
-                return self._maybe_emit_sequence(current)
         else:
-            self.event_quiet_since = 0.0
+            # Rearma pela QUEDA RELATIVA ao impacto anterior. Essa é a parte
+            # importante para AGC/Intel Smart Sound, que mantém uma cauda alta.
+            relative_release = (
+                metrics.rms <= self.hit_rms * self.release_ratio
+                or metrics.peak <= self.hit_peak * self.release_ratio
+            )
+            absolute_release = metrics.rms <= max(self.noise_rms * 2.5, 0.008)
 
-        return None
+            if relative_release or absolute_release:
+                if self.release_since == 0.0:
+                    self.release_since = current
+                elif (current - self.release_since) * 1000.0 >= self.release_ms:
+                    self.armed = True
+                    self.release_since = 0.0
+            else:
+                self.release_since = 0.0
+
+            # Failsafe: nunca fica preso indefinidamente após um impacto.
+            if (current - self.hit_started) * 1000.0 >= self.max_event_ms:
+                self.armed = True
+                self.release_since = 0.0
+
+        # Atualiza ruído somente em blocos baixos.
+        if metrics.peak < self.threshold * 0.75:
+            self.noise_rms = 0.96 * self.noise_rms + 0.04 * min(metrics.rms, self.threshold)
+
+        self.prev_rms = metrics.rms
+        self.prev_peak = metrics.peak
+        return self._maybe_emit_sequence(current)
 
 
 class ClapListener:
@@ -286,9 +280,7 @@ class ClapListener:
             if on_level:
                 on_level(metrics.rms)
             gesture = self.detector.feed_block(
-                block,
-                now=time.monotonic(),
-                samplerate=self.samplerate,
+                block, now=time.monotonic(), samplerate=self.samplerate
             )
             if gesture and result.empty():
                 result.put_nowait(gesture)

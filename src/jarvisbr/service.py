@@ -49,7 +49,8 @@ class JarvisService:
         self.tts = WindowsTTS(settings.tts_rate, settings.language)
         self.assistant = Assistant(settings, self._confirm)
         self.hotkey = WindowsHotkey(
-            lambda: self.external_triggers.put(Gesture.HOTKEY)
+            lambda: self.external_triggers.put(Gesture.HOTKEY),
+            lambda: self.external_triggers.put(Gesture.HOTKEY_AGENT),
         )
         self._thread = None
 
@@ -64,21 +65,39 @@ class JarvisService:
 
     def stop(self) -> None:
         self.stop_event.set()
+        self.hotkey.stop()
         self.external_triggers.put(Gesture.HOTKEY)
+
+    def _wait_trigger(self) -> Gesture:
+        if self.settings.clap_enabled:
+            return self.listener.wait(self.external_triggers, self.on_level)
+
+        while not self.stop_event.is_set():
+            try:
+                return self.external_triggers.get(timeout=0.25)
+            except queue.Empty:
+                continue
+        return Gesture.HOTKEY
+
+    @staticmethod
+    def _is_agent_trigger(gesture: Gesture) -> bool:
+        return gesture in {Gesture.TRIPLE_CLAP, Gesture.HOTKEY_AGENT}
 
     def run(self) -> None:
         while not self.stop_event.is_set():
             try:
                 self.on_state(AssistantState.IDLE)
-                gesture = self.listener.wait(
-                    self.external_triggers, self.on_level
-                )
+                gesture = self._wait_trigger()
                 if self.stop_event.is_set():
                     break
-                self._interaction(agent_mode=gesture == Gesture.TRIPLE_CLAP)
+                self._interaction(agent_mode=self._is_agent_trigger(gesture))
             except Exception as exc:
                 self.on_state(AssistantState.ERROR)
                 self.on_text(f"Erro: {exc}")
+
+    def interact_once(self, *, agent_mode: bool = False) -> None:
+        """Executa uma interação de voz sem iniciar o loop/hotkeys."""
+        self._interaction(agent_mode=agent_mode)
 
     def _interaction(self, *, agent_mode: bool) -> None:
         self.on_state(AssistantState.LISTENING)

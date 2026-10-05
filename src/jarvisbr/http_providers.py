@@ -59,6 +59,12 @@ class OllamaProvider(ChatProvider):
     def __init__(self, settings: Settings) -> None:
         self.url = settings.ollama_url.rstrip("/")
         self.model = settings.ollama_model
+        self.think = settings.ollama_think
+        self.num_ctx = max(1024, settings.ollama_num_ctx)
+        self.num_predict = max(32, settings.ollama_num_predict)
+        self.timeout = max(5.0, settings.ollama_timeout)
+        self.keep_alive = settings.ollama_keep_alive
+        self.last_stats: dict[str, float | int | str] = {}
 
     def complete(self, prompt: str, *, system=None, history=None) -> str:
         response = httpx.post(
@@ -67,11 +73,29 @@ class OllamaProvider(ChatProvider):
                 "model": self.model,
                 "messages": _messages(prompt, system, history),
                 "stream": False,
+                # Qwen 3.5 é um modelo de thinking. Para um assistente de voz,
+                # latência importa mais que raciocínio oculto em cada frase.
+                "think": self.think,
+                "keep_alive": self.keep_alive,
+                "options": {
+                    "num_ctx": self.num_ctx,
+                    "num_predict": self.num_predict,
+                    "temperature": 0.2,
+                },
             },
-            timeout=120,
+            timeout=httpx.Timeout(self.timeout, connect=3.0),
         )
         response.raise_for_status()
-        return str(response.json()["message"]["content"]).strip()
+        data = response.json()
+        self.last_stats = {
+            "total_duration_ns": int(data.get("total_duration", 0) or 0),
+            "load_duration_ns": int(data.get("load_duration", 0) or 0),
+            "prompt_eval_count": int(data.get("prompt_eval_count", 0) or 0),
+            "eval_count": int(data.get("eval_count", 0) or 0),
+            "eval_duration_ns": int(data.get("eval_duration", 0) or 0),
+            "done_reason": str(data.get("done_reason", "") or ""),
+        }
+        return str(data["message"]["content"]).strip()
 
     def health(self) -> tuple[bool, str]:
         try:

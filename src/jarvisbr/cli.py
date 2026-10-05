@@ -337,6 +337,23 @@ def main() -> int:
             return 1
         elapsed = time.perf_counter() - started
         print(f"Resposta em {elapsed:.2f}s: {reply}")
+        stats = getattr(provider, "last_stats", {})
+        if stats:
+            total = float(stats.get("total_duration_ns", 0)) / 1_000_000_000
+            load = float(stats.get("load_duration_ns", 0)) / 1_000_000_000
+            eval_s = float(stats.get("eval_duration_ns", 0)) / 1_000_000_000
+            eval_count = int(stats.get("eval_count", 0))
+            tok_s = eval_count / eval_s if eval_s > 0 else 0.0
+            print(
+                f"Ollama: total={total:.2f}s | carga={load:.2f}s | "
+                f"tokens={eval_count} | geração={tok_s:.1f} tok/s | "
+                f"fim={stats.get('done_reason', '')}"
+            )
+        if elapsed > 12 and getattr(provider, "name", "") == "ollama":
+            print(
+                "Latência ainda alta. Para este PC, teste qwen3.5:0.8b "
+                "se a resposta continuar acima de ~12 s."
+            )
         return 0
 
     if command == "voice-prepare":

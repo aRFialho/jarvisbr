@@ -34,6 +34,11 @@ def _parser() -> argparse.ArgumentParser:
         help="Baixa/carrega o modelo Whisper antecipadamente",
     )
 
+    sub.add_parser(
+        "provider-test",
+        help="Testa somente o provider de IA e mede o tempo de resposta",
+    )
+
     sub.add_parser("doctor", help="Verifica ambiente, microfone e provider")
     sub.add_parser("audio-devices", help="Lista todas as entradas de áudio")
 
@@ -311,6 +316,27 @@ def main() -> int:
     if command == "text":
         service = JarvisService(settings)
         print(service.handle_text(args.prompt, agent_mode=args.agent))
+        return 0
+
+    if command == "provider-test":
+        from jarvisbr.factory import build_provider
+
+        provider = build_provider(settings)
+        ok, detail = provider.health()
+        print(f"Provider selecionado: {provider.name}")
+        print(f"Health: {'OK' if ok else 'ERRO'} - {detail}")
+        started = time.perf_counter()
+        try:
+            reply = provider.complete(
+                "Responda apenas com a palavra OK.",
+                history=[],
+            )
+        except Exception as exc:
+            elapsed = time.perf_counter() - started
+            print(f"Falhou após {elapsed:.2f}s: {type(exc).__name__}: {exc}")
+            return 1
+        elapsed = time.perf_counter() - started
+        print(f"Resposta em {elapsed:.2f}s: {reply}")
         return 0
 
     if command == "voice-prepare":

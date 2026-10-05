@@ -1,16 +1,17 @@
 # Jarvis BR
 
-Assistente pessoal **local-first para Windows**, acionado por palmas e voz.
+Assistente pessoal **local-first para Windows**, com voz, atalhos globais e ferramentas locais protegidas.
 
-A proposta desta versão é simples: o computador fica escutando um gatilho acústico leve; quando reconhece a sequência, abre uma interação de voz e usa ferramentas locais com uma camada explícita de segurança.
+A operação padrão é hotkey-first: o Jarvis fica leve e o microfone só é aberto quando você chama uma interação. O detector de palmas continua no projeto, mas fica desativado por padrão enquanto evoluímos o núcleo.
 
 ## Gestos
 
 | Gatilho | Ação |
 |---|---|
-| 👏👏 | Conversa / pergunta normal |
-| 👏👏👏 | Modo agente com planejamento de ferramentas |
-| `Ctrl + Alt + J` | Atalho de conversa |
+| `Ctrl + Alt + J` | Conversa / pergunta normal |
+| `Ctrl + Alt + K` | Modo agente com planejamento de ferramentas |
+| 👏👏 | Conversa, se `JARVIS_CLAP_ENABLED=true` |
+| 👏👏👏 | Modo agente, se `JARVIS_CLAP_ENABLED=true` |
 
 No modo conversa, comandos simples são resolvidos localmente. Perguntas abertas seguem para o provider configurado.
 
@@ -50,11 +51,12 @@ Microfone
 
 ## O que já funciona
 
-- Detecção de **duas e três palmas** com pico, RMS, crest factor, cadência e cooldown.
+- Fluxo principal por **Ctrl+Alt+J** (conversa) e **Ctrl+Alt+K** (agente).
+- Detector de duas/três palmas preservado como recurso opcional, desligado por padrão.
 - Reconhecimento de voz local com `faster-whisper`.
 - Resposta falada usando SAPI5/`pyttsx3`.
 - HUD flutuante simples e sempre no topo.
-- Atalho global `Ctrl+Alt+J` usando a API nativa do Windows.
+- Atalhos globais `Ctrl+Alt+J` e `Ctrl+Alt+K` usando a API nativa do Windows.
 - Memória de conversas em SQLite local.
 - Provider automático: `OpenJarvis -> Ollama -> Gemini -> offline`.
 - Comandos locais de hora, abrir app/site, volume e screenshot.
@@ -191,9 +193,15 @@ Exemplo:
 
 O dispatcher não entrega esse pedido ao LLM. Ele resolve localmente e usa apenas a entrada allowlisted.
 
-## Ajuste das palmas
+## Palmas opcionais
 
-Os principais parâmetros ficam no `.env`:
+Para voltar a testar palmas no futuro:
+
+```env
+JARVIS_CLAP_ENABLED=true
+```
+
+Os parâmetros continuam disponíveis no `.env`:
 
 ```env
 JARVIS_CLAP_THRESHOLD=0.24
@@ -208,7 +216,16 @@ Se sons comuns estiverem ativando o Jarvis, aumente `JARVIS_CLAP_THRESHOLD` ou `
 
 Se suas palmas não forem reconhecidas, reduza `JARVIS_CLAP_THRESHOLD` aos poucos, por exemplo para `0.20`.
 
-## Teste sem microfone
+## Testes rápidos
+
+Teste completo de voz:
+
+```powershell
+.\.venv\Scripts\jarvisbr.exe voice-test
+.\.venv\Scripts\jarvisbr.exe voice-test --agent
+```
+
+Teste sem microfone:
 
 ```powershell
 .\.venv\Scripts\jarvisbr.exe text "que horas são?"

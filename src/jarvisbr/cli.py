@@ -88,6 +88,9 @@ def _clap_test(seconds: float) -> int:
         max_gap=settings.clap_max_gap,
         settle=settings.clap_settle,
         cooldown=settings.clap_cooldown,
+        high_freq_ratio=settings.clap_high_freq_ratio,
+        max_event_ms=settings.clap_max_event_ms,
+        attack_ratio=settings.clap_attack_ratio,
     )
     device = settings.input_device
 
@@ -103,41 +106,24 @@ def _clap_test(seconds: float) -> int:
         "Detector: "
         f"threshold={detector.threshold:.2f} "
         f"crest>={detector.spike_ratio:.2f} "
-        f"max_rms={detector.max_rms:.2f}"
+        f"max_rms={detector.max_rms:.2f} "
+        f"hf>={detector.high_freq_ratio:.2f} "
+        f"evento<={detector.max_event_ms:.0f}ms"
     )
     print("Faça duas palmas, aguarde 2 segundos, depois faça três palmas.")
     print("Os picos aparecerão abaixo. Ctrl+C encerra.")
     print()
 
-    messages: "queue.Queue[tuple[float, float, float, bool, Gesture | None, int]]" = queue.Queue()
-    last_report = 0.0
+    messages: "queue.Queue[tuple[object | None, Gesture | None, int]]" = queue.Queue()
 
     def callback(indata, frames, time_info, status) -> None:
-        nonlocal last_report
         block = np.asarray(indata[:, 0], dtype=np.float32)
-        metrics = detector.metrics(block)
         now = time.monotonic()
-        candidate = detector.is_clap(metrics.peak, metrics.rms)
-        previous_hit = detector.last_hit_at
-        gesture = detector.feed_metrics(metrics.peak, metrics.rms, now)
-        accepted_hit = detector.last_hit_at != previous_hit
-
-        should_report = accepted_hit or gesture is not None
-        if metrics.peak >= max(detector.threshold * 0.8, 0.02) and now - last_report >= 0.20:
-            should_report = True
-
-        if should_report:
-            last_report = now
-            messages.put(
-                (
-                    metrics.peak,
-                    metrics.rms,
-                    metrics.crest,
-                    accepted_hit,
-                    gesture,
-                    detector.count,
-                )
-            )
+        before_serial = detector.event_serial
+        gesture = detector.feed_block(block, now=now, samplerate=16000)
+        event = detector.last_event if detector.event_serial != before_serial else None
+        if event is not None or gesture is not None:
+            messages.put((event, gesture, detector.count))
 
     end = time.monotonic() + max(3.0, seconds)
     try:
@@ -151,14 +137,19 @@ def _clap_test(seconds: float) -> int:
         ):
             while time.monotonic() < end:
                 try:
-                    peak, rms, crest, accepted_hit, gesture, count = messages.get(timeout=0.1)
+                    event, gesture, count = messages.get(timeout=0.1)
                 except queue.Empty:
                     continue
-                tag = "BATIDA" if accepted_hit else "som   "
-                print(
-                    f"{tag} peak={peak:.3f} rms={rms:.3f} crest={crest:.2f} sequência={count}",
-                    flush=True,
-                )
+                if event is not None:
+                    tag = "PALMA " if event.accepted else "REJEIT"
+                    print(
+                        f"{tag} dur={event.duration_ms:.0f}ms "
+                        f"peak={event.peak:.3f} rms={event.rms:.3f} "
+                        f"crest={event.crest:.2f} hf={event.high_ratio:.2f} "
+                        f"zcr={event.zcr:.2f} ataque={event.attack_ratio:.1f} "
+                        f"seq={count} motivo={event.reason}",
+                        flush=True,
+                    )
                 if gesture == Gesture.DOUBLE_CLAP:
                     print(">>> DETECTADO: 👏👏 MODO CONVERSA", flush=True)
                 elif gesture == Gesture.TRIPLE_CLAP:

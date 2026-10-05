@@ -60,3 +60,10 @@ def test_keeps_confident_speech_segment():
     ])
     audio = np.ones(16000, dtype=np.float32) * 0.05
     assert stt.transcribe(audio, 16000) == "Que horas são?"
+
+
+def test_resample_short_audio_remains_finite():
+    audio = np.array([0.0, 0.25, -0.25, 0.0], dtype=np.float32)
+    result = WhisperSTT._resample_to_model_rate(audio, 44100)
+    assert result.size >= 1
+    assert np.all(np.isfinite(result))

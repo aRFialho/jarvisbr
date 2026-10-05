@@ -88,7 +88,7 @@ function Install-PythonIfNeeded {
   }
 
   Write-Host "[Jarvis BR] Python compatível não encontrado. Instalando Python 3.12..." -ForegroundColor Yellow
-  & winget install --id Python.Python.3.12 -e --scope user --accept-source-agreements --accept-package-agreements --disable-interactivity
+  & winget install --id Python.Python.3.12 -e --scope user --accept-source-agreements --accept-package-agreements --disable-interactivity | Out-Host
 
   Start-Sleep -Seconds 2
   $resolved = Resolve-PythonExecutable

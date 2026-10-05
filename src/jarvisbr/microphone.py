@@ -9,8 +9,8 @@ import numpy as np
 class MicrophoneRecorder:
     def __init__(
         self,
-        samplerate: int = 16000,
-        blocksize: int = 1024,
+        samplerate: int | None = None,
+        blocksize: int | None = None,
         speech_rms: float = 0.012,
         silence_seconds: float = 1.0,
         wait_for_speech: float = 3.5,
@@ -38,11 +38,17 @@ class MicrophoneRecorder:
         last_voice = started
         captured: list[np.ndarray] = []
 
+        info = sd.query_devices(self.device, "input")
+        rate = int(self.samplerate or float(info.get("default_samplerate", 16000) or 16000))
+        blocksize = int(self.blocksize or max(256, rate * 0.064))
+        self.samplerate = rate
+        self.blocksize = blocksize
+
         with sd.InputStream(
             device=self.device,
             channels=1,
-            samplerate=self.samplerate,
-            blocksize=self.blocksize,
+            samplerate=rate,
+            blocksize=blocksize,
             dtype="float32",
             callback=callback,
         ):

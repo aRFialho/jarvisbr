@@ -32,6 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     mic_test = sub.add_parser("mic-test", help="Mede o áudio bruto sem classificador")
     mic_test.add_argument("--device", help="Índice ou parte do nome do dispositivo")
     mic_test.add_argument("--seconds", type=float, default=8.0, help="Duração do teste")
+    mic_test.add_argument("--save", help="Salva o áudio bruto em WAV para conferência")
 
     return parser
 
@@ -55,7 +56,14 @@ def _device_label(device, index: int) -> str:
 
     suffix = f"  <{'/'.join(flags)}>" if flags else ""
     rate = int(float(device.get("default_samplerate", 0) or 0))
-    return f"[{index:2}] {device['name']} | entradas={device['max_input_channels']} | {rate} Hz{suffix}"
+    try:
+        hostapi = sd.query_hostapis(int(device["hostapi"]))["name"]
+    except Exception:
+        hostapi = "desconhecido"
+    return (
+        f"[{index:2}] {device['name']} | entradas={device['max_input_channels']} | "
+        f"{rate} Hz | {hostapi}{suffix}"
+    )
 
 
 def _list_audio_devices() -> int:
@@ -90,7 +98,9 @@ def _resolve_test_device(raw):
         return raw
 
 
-def _mic_test(seconds: float, raw_device=None) -> int:
+def _mic_test(seconds: float, raw_device=None, save_path=None) -> int:
+    import wave
+
     import numpy as np
     import sounddevice as sd
 
@@ -113,13 +123,15 @@ def _mic_test(seconds: float, raw_device=None) -> int:
     q = queue.Queue()
     max_peak = 0.0
     max_rms = 0.0
-    last_print = 0.0
+    started_at = time.monotonic()
+    captured: list[np.ndarray] = []
+    measurements: list[tuple[float, float, float]] = []
 
     def callback(indata, frames, time_info, status):
         block = np.asarray(indata[:, 0], dtype=np.float32)
         peak = float(np.max(np.abs(block))) if block.size else 0.0
         rms = float(np.sqrt(np.mean(np.square(block)))) if block.size else 0.0
-        q.put((time.monotonic(), peak, rms))
+        q.put((time.monotonic(), peak, rms, block.copy()))
 
     end = time.monotonic() + max(3.0, seconds)
     try:
@@ -133,15 +145,13 @@ def _mic_test(seconds: float, raw_device=None) -> int:
         ):
             while time.monotonic() < end:
                 try:
-                    ts, peak, rms = q.get(timeout=0.2)
+                    ts, peak, rms, block = q.get(timeout=0.2)
                 except queue.Empty:
                     continue
                 max_peak = max(max_peak, peak)
                 max_rms = max(max_rms, rms)
-                if ts - last_print >= 0.12 and (peak >= 0.01 or rms >= 0.004):
-                    last_print = ts
-                    bars = min(40, int(peak * 80))
-                    print(f"peak={peak:0.3f} rms={rms:0.3f} | {'#' * bars}", flush=True)
+                captured.append(block)
+                measurements.append((ts - started_at, peak, rms))
     except KeyboardInterrupt:
         pass
     except Exception as exc:
@@ -150,6 +160,30 @@ def _mic_test(seconds: float, raw_device=None) -> int:
 
     print()
     print(f"MÁXIMO: peak={max_peak:0.3f} rms={max_rms:0.3f}")
+
+    # Mostra os maiores transientes sem perder palmas por causa de throttling.
+    selected: list[tuple[float, float, float]] = []
+    for item in sorted(measurements, key=lambda row: row[1], reverse=True):
+        if all(abs(item[0] - other[0]) >= 0.08 for other in selected):
+            selected.append(item)
+        if len(selected) >= 10:
+            break
+    if selected:
+        print("TOP PICOS (separados por pelo menos 80 ms):")
+        for offset, peak, rms in sorted(selected):
+            bars = min(40, int(peak * 80))
+            print(f"  t={offset:0.3f}s peak={peak:0.3f} rms={rms:0.3f} | {'#' * bars}")
+
+    if save_path and captured:
+        audio = np.concatenate(captured)
+        pcm16 = (np.clip(audio, -1.0, 1.0) * 32767.0).astype(np.int16)
+        with wave.open(save_path, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(native_rate)
+            wf.writeframes(pcm16.tobytes())
+        print(f"WAV salvo em: {save_path}")
+
     return 0
 
 
@@ -178,7 +212,10 @@ def _clap_test(seconds: float) -> int:
         print("Rode: jarvisbr audio-devices")
         return 1
 
+    native_rate = int(float(info.get("default_samplerate", 16000) or 16000))
+    blocksize = max(128, int(native_rate * 0.016))
     print(f"Microfone: {info['name']}")
+    print(f"Taxa nativa: {native_rate} Hz | bloco: {blocksize} amostras")
     print(
         "Detector: "
         f"threshold={detector.threshold:.2f} "
@@ -197,7 +234,7 @@ def _clap_test(seconds: float) -> int:
         block = np.asarray(indata[:, 0], dtype=np.float32)
         now = time.monotonic()
         before_serial = detector.event_serial
-        gesture = detector.feed_block(block, now=now, samplerate=16000)
+        gesture = detector.feed_block(block, now=now, samplerate=native_rate)
         event = detector.last_event if detector.event_serial != before_serial else None
         if event is not None or gesture is not None:
             messages.put((event, gesture, detector.count))
@@ -207,8 +244,8 @@ def _clap_test(seconds: float) -> int:
         with sd.InputStream(
             device=device,
             channels=1,
-            samplerate=16000,
-            blocksize=256,
+            samplerate=native_rate,
+            blocksize=blocksize,
             dtype="float32",
             callback=callback,
         ):
@@ -258,7 +295,7 @@ def main() -> int:
         return _clap_test(args.seconds)
 
     if command == "mic-test":
-        return _mic_test(args.seconds, args.device)
+        return _mic_test(args.seconds, args.device, args.save)
 
     if command == "text":
         service = JarvisService(settings)

@@ -258,8 +258,8 @@ class ClapListener:
     def __init__(
         self,
         detector: ClapSequenceDetector,
-        samplerate: int = 16000,
-        blocksize: int = 256,
+        samplerate: int | None = None,
+        blocksize: int | None = None,
         device: int | str | None = None,
     ) -> None:
         self.detector = detector
@@ -287,11 +287,17 @@ class ClapListener:
 
         import sounddevice as sd
 
+        info = sd.query_devices(self.device, "input")
+        rate = int(self.samplerate or float(info.get("default_samplerate", 16000) or 16000))
+        blocksize = int(self.blocksize or max(128, rate * 0.016))
+        self.samplerate = rate
+        self.blocksize = blocksize
+
         with sd.InputStream(
             device=self.device,
             channels=1,
-            samplerate=self.samplerate,
-            blocksize=self.blocksize,
+            samplerate=rate,
+            blocksize=blocksize,
             dtype="float32",
             callback=callback,
         ):

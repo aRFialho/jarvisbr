@@ -23,6 +23,12 @@ def _parser() -> argparse.ArgumentParser:
     text.add_argument("prompt")
     text.add_argument("--agent", action="store_true")
 
+    voice_test = sub.add_parser(
+        "voice-test",
+        help="Testa microfone -> Whisper -> IA -> voz sem iniciar o serviço",
+    )
+    voice_test.add_argument("--agent", action="store_true", help="Usa modo agente")
+
     sub.add_parser("doctor", help="Verifica ambiente, microfone e provider")
     sub.add_parser("audio-devices", help="Lista todas as entradas de áudio")
 
@@ -302,6 +308,15 @@ def main() -> int:
         print(service.handle_text(args.prompt, agent_mode=args.agent))
         return 0
 
+    if command == "voice-test":
+        service = JarvisService(
+            settings,
+            on_state=lambda state: print(f"[{state.value}]"),
+            on_text=print,
+        )
+        service.interact_once(agent_mode=args.agent)
+        return 0
+
     if command == "start":
         if getattr(args, "no_ui", False):
             service = JarvisService(
@@ -311,7 +326,8 @@ def main() -> int:
             )
             service.start()
             print(
-                "Jarvis BR ativo. 👏👏 conversa | 👏👏👏 agente | CTRL+ALT+J conversa"
+                "Jarvis BR ativo. CTRL+ALT+J conversa | CTRL+ALT+K agente"
+                + (" | palmas ativas" if settings.clap_enabled else "")
             )
             try:
                 while True:

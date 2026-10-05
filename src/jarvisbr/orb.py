@@ -4,7 +4,7 @@ import queue
 import tkinter as tk
 from jarvisbr.events import AssistantState
 
-STATE_LABEL={AssistantState.IDLE:"AGUARDANDO ATALHO",AssistantState.LISTENING:"OUVINDO",AssistantState.THINKING:"PROCESSANDO",AssistantState.SPEAKING:"FALANDO",AssistantState.CONFIRMING:"CONFIRMAÇÃO",AssistantState.ERROR:"ERRO"}
+STATE_LABEL={AssistantState.IDLE:"AGUARDANDO ATALHO",AssistantState.LISTENING:"OUVINDO",AssistantState.TRANSCRIBING:"TRANSCREVENDO",AssistantState.THINKING:"PROCESSANDO",AssistantState.SPEAKING:"FALANDO",AssistantState.CONFIRMING:"CONFIRMAÇÃO",AssistantState.ERROR:"ERRO"}
 
 class OrbWindow:
     def __init__(self,on_close)->None:

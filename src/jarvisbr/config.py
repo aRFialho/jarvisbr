@@ -67,6 +67,7 @@ class Settings:
         default_factory=lambda: os.getenv("JARVIS_WHISPER_MODEL", "small")
     )
     input_device: int | str | None = field(default_factory=_input_device)
+    clap_enabled: bool = field(default_factory=lambda: _bool("JARVIS_CLAP_ENABLED", False))
 
     clap_threshold: float = field(
         default_factory=lambda: _float("JARVIS_CLAP_THRESHOLD", 0.04)

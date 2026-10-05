@@ -185,7 +185,8 @@ if (-not $OllamaExe) {
 }
 
 $RamGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-if ($RamGB -lt 15) { $Model = "qwen3.5:2b" }
+if ($RamGB -lt 10) { $Model = "qwen3.5:0.8b" }
+elseif ($RamGB -lt 15) { $Model = "qwen3.5:2b" }
 elseif ($RamGB -lt 25) { $Model = "qwen3.5:4b" }
 elseif ($RamGB -lt 45) { $Model = "qwen3.5:9b" }
 else { $Model = "qwen3.5:27b" }

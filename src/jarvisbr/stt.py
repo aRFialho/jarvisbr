@@ -84,6 +84,31 @@ class WhisperSTT:
             return ""
 
         audio = self._resample_to_model_rate(samples, samplerate)
+
+        try:
+            from faster_whisper.vad import VadOptions, get_speech_timestamps
+
+            speech = get_speech_timestamps(
+                audio,
+                VadOptions(
+                    threshold=0.65,
+                    min_speech_duration_ms=250,
+                    min_silence_duration_ms=300,
+                    speech_pad_ms=120,
+                ),
+                sampling_rate=self.TARGET_SAMPLE_RATE,
+            )
+            speech_ms = sum(
+                max(0, int(item["end"]) - int(item["start"]))
+                for item in speech
+            ) * 1000.0 / self.TARGET_SAMPLE_RATE
+            if not speech or speech_ms < 250.0:
+                self.on_status("VAD: nenhuma fala confiável detectada.")
+                return ""
+            self.on_status(f"VAD: {speech_ms:.0f} ms de fala detectada.")
+        except Exception as exc:
+            self.on_status(f"VAD prévio indisponível: {exc}")
+
         segments, _ = self._load().transcribe(
             audio,
             language=self.language,
